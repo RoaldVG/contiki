@@ -4,12 +4,10 @@
  * \author
  *         Marie-Paule Uwase
  *         August 7, 2012
- *         Tested and modified on September 8, 2012.
- *         Send address is directly read from rime.
- *
- *         Modified receiver functions on January 12, 2014 by NGUYEN Thanh Long
- *         Version used by JT on April 26, 2015 in Poix.
- *         Refactored by JT on May 10, 2015
+ *         Roald Van Glabbeek
+ * 		   March 3, 2020
+ * 
+ *         Updated for newer contiki release en Zolertia Zoul (firefly)
  */
 
 // imported libraries.

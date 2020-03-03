@@ -5,17 +5,10 @@
  * \author
  *         Marie-Paule Uwase
  *         August 13, 2012
- *         Tested and modified on September 8, 2012. Includes a useless but necessary timer!
- *         Writes with a fixed format in the serialdump to facilitate transfer of data to excel.
- *         Ack power is 0dBm, regardless of the sender settings.
- *         Version used for measurements on May 18, 2013 in Poix.
- *         Version modified by Maite Bezunartea in August 2014 for using it in the sink of the black part of a dual network 
- *         Version used by JT on April 26, 2015 in Poix 
- *         Refactored by JT on May 5, 2015.
- *         
- *         GPIOS initialisation bug corrected in August 2016
- *         GPIO P1.0 pulsed rather than toggled. August 7, 2016.
- *         Pulse duration based on RTIMER, August 28, 2016, **** untested! ****
+ *         Roald Van Glabbeek
+ * 		   March 3, 2020
+ * 
+ *         Updated for newer contiki release en Zolertia Zoul (firefly)
  */
 
 // imported libraries.
