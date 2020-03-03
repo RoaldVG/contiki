@@ -88,12 +88,6 @@ tcpip_handler(void)
 					UIP_IP_BUF->srcipaddr.u8[sizeof(UIP_IP_BUF->srcipaddr.u8) - 1], received,msg.blackseqno,msg.whiteseqno,
                                         msg.energy,msg.counter_ADC, 
 										msg.timestamp_app,msg.timestamp_mac,timestamp,rtime);
-#if SERVER_REPLY
-    PRINTF("DATA sending reply\n");
-    uip_ipaddr_copy(&server_conn->ripaddr, &UIP_IP_BUF->srcipaddr);
-    uip_udp_packet_send(server_conn, "Reply", sizeof("Reply"));
-    uip_create_unspecified(&server_conn->ripaddr);
-#endif
   }
 }
 static void
@@ -147,7 +141,7 @@ PROCESS_THREAD(white_sink_process, ev, data)
    uip_ip6addr(&ipaddr, UIP_DS6_DEFAULT_PREFIX, 0, 0, 0, 0, 0, 0, 1);
 #elif 1
 /* Mode 2 - 16 bits inline */
-  uip_ip6addr(&ipaddr, UIP_DS6_DEFAULT_PREFIX, 0, 0, 0, 0, 0x00ff, 0xfe00, 1);
+  uip_ip6addr(&ipaddr, UIP_DS6_DEFAULT_PREFIX, 0, 0, 0, 0, 0x00ff, 0xfe00, 0);
 #else
 /* Mode 3 - derived from link local (MAC) address */
   uip_ip6addr(&ipaddr, UIP_DS6_DEFAULT_PREFIX, 0, 0, 0, 0, 0, 0, 0);

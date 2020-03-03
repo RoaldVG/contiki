@@ -28,17 +28,17 @@
  */
 
 #include "contiki.h"
-#include "sys/ctimer.h"
+#include "lib/random.h"
 #include "net/ip/uip.h"
 #include "net/ipv6/uip-ds6.h"
 #include "net/ip/uip-udp-packet.h"
-#include "sys/ctimer.h"
 #include <stdio.h>
 #include <string.h>
 
 #include "net/ipv6/uip-ds6-route.h"
 
-#include "dev/gpio.h"
+#include "sys/etimer.h"
+#include "cpu/cc2538/dev/gpio.h"
 
 #define UDP_CLIENT_PORT 8765
 #define UDP_SERVER_PORT 5678
@@ -48,85 +48,144 @@
 #define DEBUG DEBUG_FULL
 #include "net/ip/uip-debug.h"
 
+#define AVERAGE_SEND_INTERVAL CLOCK_SECOND
+#define RANDOM 1
+#define MIN_SEND_INTERVAL 1
+#define INTERVAL_RANGE (AVERAGE_SEND_INTERVAL - MIN_SEND_INTERVAL) * 2 
+
+#if RANDOM
+#define SEND_INTERVAL  ((INTERVAL_RANGE + random_rand()) % INTERVAL_RANGE) + MIN_SEND_INTERVAL
+#else
+#define SEND_INTERVAL  AVERAGE_SEND_INTERVAL
+#endif
+
 /* Data structure of messages sent from sender
  *
  */
 struct testmsg {       
 	uint16_t  blackseqno;
 	uint16_t  timestamp_app;
-  char      padding[44];
-  int16_t  timestamp_mac;        
+	uint16_t cpu;
+	uint16_t lpm;
+	uint16_t transmit;
+	uint16_t listen;
+  char      padding[82];
+  uint16_t  timestamp_mac;
 };
+
+uint16_t seqno=0;
 
 static struct uip_udp_conn *client_conn;
 static uip_ipaddr_t server_ipaddr;
 
 /*---------------------------------------------------------------------------*/
-PROCESS(black_receiver_process, "black receiver process");
-AUTOSTART_PROCESSES(&black_receiver_process);
+PROCESS(observed_sender_process, "Observed sender process");
+AUTOSTART_PROCESSES(&observed_sender_process);
 /*---------------------------------------------------------------------------*/
-static int seqno;
-
 void
 GPIOS_init(void)
 {
-	GPIO_SET_OUTPUT(GPIO_PORT_TO_BASE(0),GPIO_PIN_MASK(2));		//GPIO PA2
-	GPIO_SET_OUTPUT(GPIO_PORT_TO_BASE(2),GPIO_PIN_MASK(0));		//GPIO PC0
-	GPIO_SET_OUTPUT(GPIO_PORT_TO_BASE(2),GPIO_PIN_MASK(1));		//GPIO PC1
-	GPIO_SET_OUTPUT(GPIO_PORT_TO_BASE(2),GPIO_PIN_MASK(4));		//GPIO PC4
-	GPIO_SET_OUTPUT(GPIO_PORT_TO_BASE(2),GPIO_PIN_MASK(5));		//GPIO PC5
-	GPIO_SET_OUTPUT(GPIO_PORT_TO_BASE(3),GPIO_PIN_MASK(1));		//GPIO PD1
-	GPIO_SET_OUTPUT(GPIO_PORT_TO_BASE(3),GPIO_PIN_MASK(2));		//GPIO PD2
-}
 
+	GPIO_SET_OUTPUT(GPIO_A_BASE,GPIO_PIN_MASK(2));		//GPIO PA2
+	GPIO_SET_OUTPUT(GPIO_C_BASE,GPIO_PIN_MASK(0));		//GPIO PC0
+	GPIO_SET_OUTPUT(GPIO_C_BASE,GPIO_PIN_MASK(1));		//GPIO PC1
+	GPIO_SET_OUTPUT(GPIO_C_BASE,GPIO_PIN_MASK(4));		//GPIO PC4
+	GPIO_SET_OUTPUT(GPIO_C_BASE,GPIO_PIN_MASK(5));		//GPIO PC5
+	GPIO_SET_OUTPUT(GPIO_D_BASE,GPIO_PIN_MASK(1));		//GPIO PD1
+	GPIO_SET_OUTPUT(GPIO_D_BASE,GPIO_PIN_MASK(2));		//GPIO PD2
+}
+/*---------------------------------------------------------------------------*/
 void
 clear_GPIOS(void)
 {
 //clear all output pins
-	GPIO_CLR_PIN(GPIO_PORT_TO_BASE(2),GPIO_PIN_MASK(0));		//GPIO PC0
-	GPIO_CLR_PIN(GPIO_PORT_TO_BASE(2),GPIO_PIN_MASK(1));		//GPIO PC1
-	GPIO_CLR_PIN(GPIO_PORT_TO_BASE(2),GPIO_PIN_MASK(4));		//GPIO PC4
-	GPIO_CLR_PIN(GPIO_PORT_TO_BASE(2),GPIO_PIN_MASK(5));		//GPIO PC5
-	GPIO_CLR_PIN(GPIO_PORT_TO_BASE(3),GPIO_PIN_MASK(1));		//GPIO PD1
-	GPIO_CLR_PIN(GPIO_PORT_TO_BASE(3),GPIO_PIN_MASK(2));		//GPIO PD2
+	GPIO_CLR_PIN(GPIO_C_BASE,GPIO_PIN_MASK(0));		//GPIO PC0
+	GPIO_CLR_PIN(GPIO_C_BASE,GPIO_PIN_MASK(1));		//GPIO PC1
+	GPIO_CLR_PIN(GPIO_C_BASE,GPIO_PIN_MASK(4));		//GPIO PC4
+	GPIO_CLR_PIN(GPIO_C_BASE,GPIO_PIN_MASK(5));		//GPIO PC5
+	GPIO_CLR_PIN(GPIO_D_BASE,GPIO_PIN_MASK(1));		//GPIO PD1
+	GPIO_CLR_PIN(GPIO_D_BASE,GPIO_PIN_MASK(2));		//GPIO PD2
 }
-
+/*---------------------------------------------------------------------------*/
 static void
 tcpip_handler(void)
 {
-
-
-  struct testmsg msg;
+  char *str;
 
   if(uip_newdata()) {
-	memcpy(&msg, uip_appdata, sizeof(msg));
-    seqno++;
-    printf("DATA recv from %d\n", seqno);
+    str = uip_appdata;
+    str[uip_datalen()] = '\0';
+    //reply++;
+    printf("DATA recv '%s' (s:%d, r:%d)\n", str, seqno);//, reply);
   }
+}
+/*---------------------------------------------------------------------------*/
+static void
+send_packet()//void *ptr)
+{
+	unsigned long cpu, lpm, transmit, listen;
+	static unsigned long last_cpu, last_lpm, last_transmit, last_listen;
+	struct testmsg msg;
 
-  static uint8_t seqno_bits[6];			
+	seqno++;
+
+	/*Set general info*/
+	msg.blackseqno=seqno;		
+	msg.timestamp_app= clock_time();
+	energest_flush();
+
+	cpu = energest_type_time(ENERGEST_TYPE_CPU) - last_cpu;
+	lpm = energest_type_time(ENERGEST_TYPE_LPM) - last_lpm;
+	transmit = energest_type_time(ENERGEST_TYPE_TRANSMIT) - last_transmit;
+	listen = energest_type_time(ENERGEST_TYPE_LISTEN) - last_listen;
+
+	/* Make sure that the values are within 16 bits. If they are larger,
+					we scale them down to fit into 16 bits. */
+	while(cpu >= 65536ul || lpm >= 65536ul ||
+				transmit >= 65536ul || listen >= 65536ul) {
+		cpu = cpu >> 1;
+		lpm = lpm >> 1;
+		transmit = transmit >> 1;
+		listen = listen >> 1;
+		}
+
+	msg.cpu = cpu;
+	msg.lpm = lpm;
+	msg.transmit = transmit;
+	msg.listen = listen;
+
+	/*
+	*      convert seqno into bits and set the GPIO bits accordingly
+	*/
+	static uint8_t seqno_bits[6];			
 	uint8_t i;
 	for (i = 0; i < 6; i++) {
 		seqno_bits[i] = msg.blackseqno & (1 << i) ? 1 : 0;
 	}		//least significant bit in seqno_bits[0]
-	//struct testmsg msg;
-	//memcpy(&msg, packetbuf_dataptr(), sizeof(msg));
-/*
- *      convert seqno into bits and set the GPIO bits accordingly
- */
-	clear_GPIOS();
 
-	if ( seqno_bits[0]==1 )	GPIO_SET_PIN(GPIO_PORT_TO_BASE(2),GPIO_PIN_MASK(0));       //  write a 1 in C0
-	if ( seqno_bits[1]==1 )	GPIO_SET_PIN(GPIO_PORT_TO_BASE(2),GPIO_PIN_MASK(1));       //  write a 1 in C1
-	if ( seqno_bits[2]==1 )	GPIO_SET_PIN(GPIO_PORT_TO_BASE(2),GPIO_PIN_MASK(4));       //  write a 1 in C4
-	if ( seqno_bits[3]==1 )	GPIO_SET_PIN(GPIO_PORT_TO_BASE(2),GPIO_PIN_MASK(5));       //  write a 1 in C5
-	if ( seqno_bits[4]==1 )	GPIO_SET_PIN(GPIO_PORT_TO_BASE(3),GPIO_PIN_MASK(1));       //  write a 1 in D1
-	if ( seqno_bits[5]==1 )	GPIO_SET_PIN(GPIO_PORT_TO_BASE(3),GPIO_PIN_MASK(2));       //  write a 1 in D2
-
-	if (GPIO_READ_PIN(GPIO_PORT_TO_BASE(0),GPIO_PIN_MASK(2)) == 0)
-		GPIO_SET_PIN(GPIO_PORT_TO_BASE(0),GPIO_PIN_MASK(2));
+	if ( seqno_bits[0]==1 )	GPIO_SET_PIN(GPIO_C_BASE,GPIO_PIN_MASK(0));       //  write a 1 in C0
+	if ( seqno_bits[1]==1 )	GPIO_SET_PIN(GPIO_C_BASE,GPIO_PIN_MASK(1));       //  write a 1 in C1
+	if ( seqno_bits[2]==1 )	GPIO_SET_PIN(GPIO_C_BASE,GPIO_PIN_MASK(4));       //  write a 1 in C4
+	if ( seqno_bits[3]==1 )	GPIO_SET_PIN(GPIO_C_BASE,GPIO_PIN_MASK(5));       //  write a 1 in C5
+	if ( seqno_bits[4]==1 )	GPIO_SET_PIN(GPIO_D_BASE,GPIO_PIN_MASK(1));       //  write a 1 in D1
+	if ( seqno_bits[5]==1 )	GPIO_SET_PIN(GPIO_D_BASE,GPIO_PIN_MASK(2));       //  write a 1 in D2
+	
+	if (GPIO_READ_PIN(GPIO_A_BASE,GPIO_PIN_MASK(2)) == 0)
+		GPIO_SET_PIN(GPIO_A_BASE,GPIO_PIN_MASK(2));
 	else
-		GPIO_CLR_PIN(GPIO_PORT_TO_BASE(0),GPIO_PIN_MASK(2));
+		GPIO_CLR_PIN(GPIO_A_BASE,GPIO_PIN_MASK(2));
+
+  PRINTF("DATA sent to %d\n",
+         server_ipaddr.u8[sizeof(server_ipaddr.u8) - 1]);
+  PRINTF("%d,%d,%d\n",msg.blackseqno,msg.cpu,msg.listen);
+  
+  uip_udp_packet_sendto(client_conn, &msg, sizeof(msg),
+                        &server_ipaddr, UIP_HTONS(UDP_SERVER_PORT));
+	
+	last_cpu = energest_type_time(ENERGEST_TYPE_CPU);
+	last_lpm = energest_type_time(ENERGEST_TYPE_LPM);
+	last_transmit = energest_type_time(ENERGEST_TYPE_TRANSMIT);
+	last_listen = energest_type_time(ENERGEST_TYPE_LISTEN);
 }
 /*---------------------------------------------------------------------------*/
 static void
@@ -155,7 +214,7 @@ set_global_address(void)
 {
   uip_ipaddr_t ipaddr;
 
-  uip_ip6addr(&ipaddr, UIP_DS6_DEFAULT_PREFIX, 0, 0, 0, 0, 0, 0, 0);
+  uip_ip6addr(&ipaddr, UIP_DS6_DEFAULT_PREFIX, 0, 0, 0, 0, 0, 0, 1);
   uip_ds6_set_addr_iid(&ipaddr, &uip_lladdr);
   uip_ds6_addr_add(&ipaddr, 0, ADDR_AUTOCONF);
 
@@ -180,15 +239,18 @@ set_global_address(void)
    uip_ip6addr(&server_ipaddr, UIP_DS6_DEFAULT_PREFIX, 0, 0, 0, 0, 0, 0, 1);
 #elif 1
 /* Mode 2 - 16 bits inline */
-  uip_ip6addr(&server_ipaddr, UIP_DS6_DEFAULT_PREFIX, 0, 0, 0, 0, 0x00ff, 0xfe00, 1);
+  uip_ip6addr(&server_ipaddr, UIP_DS6_DEFAULT_PREFIX, 0, 0, 0, 0, 0x00ff, 0xfe00, 2);
 #else
 /* Mode 3 - derived from server link-local (MAC) address */
   uip_ip6addr(&server_ipaddr, UIP_DS6_DEFAULT_PREFIX, 0, 0, 0, 0x0250, 0xc2ff, 0xfea8, 0xcd1a); //redbee-econotag
 #endif
 }
 /*---------------------------------------------------------------------------*/
-PROCESS_THREAD(black_receiver_process, ev, data)
+PROCESS_THREAD(observed_sender_process, ev, data)
 {
+  static struct etimer periodic;
+  static struct ctimer backoff_timer;
+
   PROCESS_BEGIN();
 
   PROCESS_PAUSE();
@@ -215,10 +277,17 @@ PROCESS_THREAD(black_receiver_process, ev, data)
   PRINTF(" local/remote port %u/%u\n",
 	UIP_HTONS(client_conn->lport), UIP_HTONS(client_conn->rport));
 
+  etimer_set(&periodic, SEND_INTERVAL);
   while(1) {
     PROCESS_YIELD();
     if(ev == tcpip_event) {
       tcpip_handler();
+    }
+
+    if(etimer_expired(&periodic)) {
+      etimer_reset(&periodic);
+      send_packet();
+      ctimer_set(&backoff_timer, SEND_INTERVAL, send_packet, NULL);
     }
   }
 

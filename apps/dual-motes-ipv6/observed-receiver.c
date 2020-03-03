@@ -28,35 +28,29 @@
  */
 
 #include "contiki.h"
-#include "lib/random.h"
-#include "sys/ctimer.h"
+#include "contiki-lib.h"
+#include "contiki-net.h"
 #include "net/ip/uip.h"
-#include "net/ipv6/uip-ds6.h"
-#include "net/ip/uip-udp-packet.h"
-#include "sys/ctimer.h"
+#include "net/rpl/rpl.h"
+
+#include "net/netstack.h"
 #include <stdio.h>
 #include <string.h>
 
-#include "net/ipv6/uip-ds6-route.h"
-
 #include "dev/gpio.h"
+
+#define DEBUG DEBUG_FULL
+#include "net/ip/uip-debug.h"
+
+#define UIP_IP_BUF   ((struct uip_ip_hdr *)&uip_buf[UIP_LLH_LEN])
+
+#define UDP_CLIENT_PORT	8765
+#define UDP_SERVER_PORT	5678
 
 #define UDP_CLIENT_PORT 8765
 #define UDP_SERVER_PORT 5678
 
 #define UDP_EXAMPLE_ID  190
-
-#define DEBUG DEBUG_FULL
-#include "net/ip/uip-debug.h"
-
-#ifndef PERIOD
-#define PERIOD 5
-#endif
-
-#define START_INTERVAL		(15 * CLOCK_SECOND)
-#define SEND_INTERVAL		(PERIOD * CLOCK_SECOND)
-#define SEND_TIME		(random_rand() % (SEND_INTERVAL))
-#define MAX_PAYLOAD_LEN		30
 
 /* Data structure of messages sent from sender
  *
@@ -64,28 +58,19 @@
 struct testmsg {       
 	uint16_t  blackseqno;
 	uint16_t  timestamp_app;
-	uint16_t cpu;
-	uint16_t lpm;
-	uint16_t transmit;
-	uint16_t listen;
-    char      padding[82];
-    uint16_t  timestamp_mac;
+  char      padding[44];
+  int16_t  timestamp_mac;        
 };
 
-uint16_t seqno=0;
-
-static struct uip_udp_conn *client_conn;
-static uip_ipaddr_t server_ipaddr;
+static struct uip_udp_conn *server_conn;
 
 /*---------------------------------------------------------------------------*/
-PROCESS(udp_client_process, "UDP client process");
-AUTOSTART_PROCESSES(&udp_client_process);
+PROCESS(observed_receiver_process, "observed receiver process");
+AUTOSTART_PROCESSES(&observed_receiver_process);
 /*---------------------------------------------------------------------------*/
-
 void
 GPIOS_init(void)
 {
-
 	GPIO_SET_OUTPUT(GPIO_PORT_TO_BASE(0),GPIO_PIN_MASK(2));		//GPIO PA2
 	GPIO_SET_OUTPUT(GPIO_PORT_TO_BASE(2),GPIO_PIN_MASK(0));		//GPIO PC0
 	GPIO_SET_OUTPUT(GPIO_PORT_TO_BASE(2),GPIO_PIN_MASK(1));		//GPIO PC1
@@ -94,7 +79,7 @@ GPIOS_init(void)
 	GPIO_SET_OUTPUT(GPIO_PORT_TO_BASE(3),GPIO_PIN_MASK(1));		//GPIO PD1
 	GPIO_SET_OUTPUT(GPIO_PORT_TO_BASE(3),GPIO_PIN_MASK(2));		//GPIO PD2
 }
-
+/*---------------------------------------------------------------------------*/
 void
 clear_GPIOS(void)
 {
@@ -106,80 +91,28 @@ clear_GPIOS(void)
 	GPIO_CLR_PIN(GPIO_PORT_TO_BASE(3),GPIO_PIN_MASK(1));		//GPIO PD1
 	GPIO_CLR_PIN(GPIO_PORT_TO_BASE(3),GPIO_PIN_MASK(2));		//GPIO PD2
 }
-
-static void
-tcpip_handler(void)
-{/*
-  char *str;
-
-  if(uip_newdata()) {
-    str = uip_appdata;
-    str[uip_datalen()] = '\0';
-    //reply++;
-    printf("DATA recv '%s' (s:%d, r:%d)\n", str, seqno);//, reply);
-  }*/
-}
 /*---------------------------------------------------------------------------*/
 static void
-send_packet(void *ptr)
+tcpip_handler(void)
 {
-  //char buf[MAX_PAYLOAD_LEN];
+  struct testmsg msg;
 
-#ifdef SERVER_REPLY
-  uint8_t num_used = 0;
-  uip_ds6_nbr_t *nbr;
-
-  nbr = nbr_table_head(ds6_neighbors);
-  while(nbr != NULL) {
-    nbr = nbr_table_next(ds6_neighbors, nbr);
-    num_used++;
+  if(uip_newdata()) {
+	  memcpy(&msg, uip_appdata, sizeof(msg));
+    printf("DATA recv from %d\n", uip_udp_conn->ripaddr.u8[sizeof(uip_udp_conn->ripaddr.u8) - 1]);
   }
 
-  if(seqno > 0) {
-    ANNOTATE("#A r=%d/%d,color=%s,n=%d %d\n", reply, seqno,
-             reply == seqno ? "GREEN" : "RED", uip_ds6_route_num_routes(), num_used);
-  }
-#endif /* SERVER_REPLY */
-
-	unsigned long cpu, lpm, transmit, listen;
-	static unsigned long last_cpu, last_lpm, last_transmit, last_listen;
-	struct testmsg msg;
-
-	seqno++;
-
-	/*Set general info*/
-	msg.blackseqno=seqno;		
-	msg.timestamp_app= clock_time();
-	energest_flush();
-
-	cpu = energest_type_time(ENERGEST_TYPE_CPU) - last_cpu;
-	lpm = energest_type_time(ENERGEST_TYPE_LPM) - last_lpm;
-	transmit = energest_type_time(ENERGEST_TYPE_TRANSMIT) - last_transmit;
-	listen = energest_type_time(ENERGEST_TYPE_LISTEN) - last_listen;
-
-	/* Make sure that the values are within 16 bits. If they are larger,
-					we scale them down to fit into 16 bits. */
-	while(cpu >= 65536ul || lpm >= 65536ul ||
-				transmit >= 65536ul || listen >= 65536ul) {
-		cpu = cpu >> 1;
-		lpm = lpm >> 1;
-		transmit = transmit >> 2;
-		listen = listen >> 2;
-		}
-
-	msg.cpu = cpu;
-	msg.lpm = lpm;
-	msg.transmit = transmit;
-	msg.listen = listen;
-
-	/*
-	*      convert seqno into bits and set the GPIO bits accordingly
-	*/
-	static uint8_t seqno_bits[6];			
+  static uint8_t seqno_bits[6];			
 	uint8_t i;
 	for (i = 0; i < 6; i++) {
 		seqno_bits[i] = msg.blackseqno & (1 << i) ? 1 : 0;
 	}		//least significant bit in seqno_bits[0]
+	//struct testmsg msg;
+	//memcpy(&msg, packetbuf_dataptr(), sizeof(msg));
+/*
+ *      convert seqno into bits and set the GPIO bits accordingly
+ */
+	clear_GPIOS();
 
 	if ( seqno_bits[0]==1 )	GPIO_SET_PIN(GPIO_PORT_TO_BASE(2),GPIO_PIN_MASK(0));       //  write a 1 in C0
 	if ( seqno_bits[1]==1 )	GPIO_SET_PIN(GPIO_PORT_TO_BASE(2),GPIO_PIN_MASK(1));       //  write a 1 in C1
@@ -187,24 +120,11 @@ send_packet(void *ptr)
 	if ( seqno_bits[3]==1 )	GPIO_SET_PIN(GPIO_PORT_TO_BASE(2),GPIO_PIN_MASK(5));       //  write a 1 in C5
 	if ( seqno_bits[4]==1 )	GPIO_SET_PIN(GPIO_PORT_TO_BASE(3),GPIO_PIN_MASK(1));       //  write a 1 in D1
 	if ( seqno_bits[5]==1 )	GPIO_SET_PIN(GPIO_PORT_TO_BASE(3),GPIO_PIN_MASK(2));       //  write a 1 in D2
-	
+
 	if (GPIO_READ_PIN(GPIO_PORT_TO_BASE(0),GPIO_PIN_MASK(2)) == 0)
 		GPIO_SET_PIN(GPIO_PORT_TO_BASE(0),GPIO_PIN_MASK(2));
 	else
 		GPIO_CLR_PIN(GPIO_PORT_TO_BASE(0),GPIO_PIN_MASK(2));
-
-	
-
-  PRINTF("DATA send to %d\n",
-         server_ipaddr.u8[sizeof(server_ipaddr.u8) - 1]);
-  
-  uip_udp_packet_sendto(client_conn, &msg, sizeof(msg),
-                        &server_ipaddr, UIP_HTONS(UDP_SERVER_PORT));
-	
-	last_cpu = energest_type_time(ENERGEST_TYPE_CPU);
-	last_lpm = energest_type_time(ENERGEST_TYPE_LPM);
-	last_transmit = energest_type_time(ENERGEST_TYPE_TRANSMIT);
-	last_listen = energest_type_time(ENERGEST_TYPE_LISTEN);
 }
 /*---------------------------------------------------------------------------*/
 static void
@@ -228,19 +148,21 @@ print_local_addresses(void)
   }
 }
 /*---------------------------------------------------------------------------*/
-static void
-set_global_address(void)
+PROCESS_THREAD(observed_receiver_process, ev, data)
 {
   uip_ipaddr_t ipaddr;
+  struct uip_ds6_addr *root_if;
 
-  uip_ip6addr(&ipaddr, UIP_DS6_DEFAULT_PREFIX, 0, 0, 0, 0, 0, 0, 0);
-  uip_ds6_set_addr_iid(&ipaddr, &uip_lladdr);
-  uip_ds6_addr_add(&ipaddr, 0, ADDR_AUTOCONF);
+  PROCESS_BEGIN();
 
+  PROCESS_PAUSE();
+
+  PRINTF("UDP server started. nbr:%d routes:%d\n",
+         NBR_TABLE_CONF_MAX_NEIGHBORS, UIP_CONF_MAX_ROUTES);
+
+#if UIP_CONF_ROUTER
 /* The choice of server address determines its 6LoWPAN header compression.
- * (Our address will be compressed Mode 3 since it is derived from our
- * link-local address)
- * Obviously the choice made here must also be selected in udp-server.c.
+ * Obviously the choice made here must also be selected in udp-client.c.
  *
  * For correct Wireshark decoding using a sniffer, add the /64 prefix to the
  * 6LowPAN protocol preferences,
@@ -248,64 +170,56 @@ set_global_address(void)
  * then overwrites it.
  * (Setting Context 0 to fd00::1111:2222:3333:4444 will report a 16 bit
  * compressed address of fd00::1111:22ff:fe33:xxxx)
- *
- * Note the IPCMV6 checksum verification depends on the correct uncompressed
- * addresses.
+ * Note Wireshark's IPCMV6 checksum verification depends on the correct
+ * uncompressed addresses.
  */
  
 #if 0
 /* Mode 1 - 64 bits inline */
-   uip_ip6addr(&server_ipaddr, UIP_DS6_DEFAULT_PREFIX, 0, 0, 0, 0, 0, 0, 1);
+   uip_ip6addr(&ipaddr, UIP_DS6_DEFAULT_PREFIX, 0, 0, 0, 0, 0, 0, 1);
 #elif 1
 /* Mode 2 - 16 bits inline */
-  uip_ip6addr(&server_ipaddr, UIP_DS6_DEFAULT_PREFIX, 0, 0, 0, 0, 0x00ff, 0xfe00, 1);
+  uip_ip6addr(&ipaddr, UIP_DS6_DEFAULT_PREFIX, 0, 0, 0, 0, 0x00ff, 0xfe00, 2);
 #else
-/* Mode 3 - derived from server link-local (MAC) address */
-  uip_ip6addr(&server_ipaddr, UIP_DS6_DEFAULT_PREFIX, 0, 0, 0, 0x0250, 0xc2ff, 0xfea8, 0xcd1a); //redbee-econotag
+/* Mode 3 - derived from link local (MAC) address */
+  uip_ip6addr(&ipaddr, UIP_DS6_DEFAULT_PREFIX, 0, 0, 0, 0, 0, 0, 0);
+  uip_ds6_set_addr_iid(&ipaddr, &uip_lladdr);
 #endif
-}
-/*---------------------------------------------------------------------------*/
-PROCESS_THREAD(udp_client_process, ev, data)
-{
-  static struct etimer periodic;
-  static struct ctimer backoff_timer;
 
-  PROCESS_BEGIN();
-
-  PROCESS_PAUSE();
-
-  set_global_address();
-
-  PRINTF("UDP client process started nbr:%d routes:%d\n",
-         NBR_TABLE_CONF_MAX_NEIGHBORS, UIP_CONF_MAX_ROUTES);
-
+  uip_ds6_addr_add(&ipaddr, 0, ADDR_MANUAL);
+  root_if = uip_ds6_addr_lookup(&ipaddr);
+  if(root_if != NULL) {
+    rpl_dag_t *dag;
+    dag = rpl_set_root(RPL_DEFAULT_INSTANCE,(uip_ip6addr_t *)&ipaddr);
+    uip_ip6addr(&ipaddr, UIP_DS6_DEFAULT_PREFIX, 0, 0, 0, 0, 0, 0, 0);
+    rpl_set_prefix(dag, &ipaddr, 64);
+    PRINTF("created a new RPL dag\n");
+  } else {
+    PRINTF("failed to create a new RPL DAG\n");
+  }
+#endif /* UIP_CONF_ROUTER */
+  
   print_local_addresses();
 
   GPIOS_init();
 
-  /* new connection with remote host */
-  client_conn = udp_new(NULL, UIP_HTONS(UDP_SERVER_PORT), NULL); 
-  if(client_conn == NULL) {
+  server_conn = udp_new(NULL, UIP_HTONS(UDP_CLIENT_PORT), NULL);
+  if(server_conn == NULL) {
     PRINTF("No UDP connection available, exiting the process!\n");
     PROCESS_EXIT();
   }
-  udp_bind(client_conn, UIP_HTONS(UDP_CLIENT_PORT)); 
+  udp_bind(server_conn, UIP_HTONS(UDP_SERVER_PORT));
 
-  PRINTF("Created a connection with the server ");
-  PRINT6ADDR(&client_conn->ripaddr);
-  PRINTF(" local/remote port %u/%u\n",
-	UIP_HTONS(client_conn->lport), UIP_HTONS(client_conn->rport));
+  PRINTF("Created a server connection with remote address ");
+  PRINT6ADDR(&server_conn->ripaddr);
+  PRINTF(" local/remote port %u/%u\n", UIP_HTONS(server_conn->lport),
+         UIP_HTONS(server_conn->rport));
 
-  etimer_set(&periodic, SEND_INTERVAL);
+
   while(1) {
     PROCESS_YIELD();
     if(ev == tcpip_event) {
       tcpip_handler();
-    }
-
-    if(etimer_expired(&periodic)) {
-      etimer_reset(&periodic);
-      ctimer_set(&backoff_timer, SEND_TIME, send_packet, NULL);
     }
   }
 
