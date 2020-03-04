@@ -256,6 +256,7 @@ PROCESS_THREAD(temp_process, ev, data)
 
 	/* Configure the ADC ports */
   	adc_zoul.configure(SENSORS_HW_INIT, ZOUL_SENSORS_ADC1);
+	adc_zoul.configure(ZOUL_SENSORS_CONFIGURE_TYPE_DECIMATION_RATE, SOC_ADC_ADCCON_DIV_64);
 	while(1)
 	{
 		//    wait for the ADC_READ_INTERVAL time
@@ -263,7 +264,7 @@ PROCESS_THREAD(temp_process, ev, data)
 		PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&et));
 
 		counter++;
-		int ADC_val = adc_zoul.value(ZOUL_SENSORS_ADC3);
+		int ADC_val = adc_zoul.value(ZOUL_SENSORS_ADC1);
 		ADCResult += ADC_val;
 		printf("%d\n",ADC_val);
 		etimer_reset(&et);

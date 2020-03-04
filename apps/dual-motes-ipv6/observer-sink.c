@@ -16,6 +16,19 @@
  *          
  */
 
+/**
+ * \file
+ *          Unicast receiving test program
+ *          Accepts messages from everybody
+ * \author
+ *         Marie-Paule Uwase
+ *         August 13, 2012
+ *         Roald Van Glabbeek
+ * 		     March 3, 2020
+ * 
+ *         Updated for newer contiki release en Zolertia Zoul (firefly) and IPv6
+ */
+
 // imported libraries.
 
 #include "contiki.h"

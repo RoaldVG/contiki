@@ -27,6 +27,18 @@
  *
  */
 
+/**
+ * \file
+ *         Unicast sending test program
+ * \author
+ *         Marie-Paule Uwase
+ *         August 7, 2012
+ *         Roald Van Glabbeek
+ * 		   March 3, 2020
+ * 
+ *         Updated for newer contiki release en Zolertia Zoul (firefly) and IPv6
+ */
+
 #include "contiki.h"
 #include "lib/random.h"
 #include "net/ip/uip.h"

@@ -5,8 +5,8 @@ TARGET=zoul
 BOARD = firefly
 endif
 
-all: black-receiver-unicast-etnew-maite black-receiver black-sender-energest \
-	 white-sender-maite white-sink
+all: observed-receiver-unicast-etnew observed-receiver observed-sender-energest \
+	 observer-sender observer-sink
 
 CONTIKI_WITH_RIME = 1
 include $(CONTIKI)/Makefile.include

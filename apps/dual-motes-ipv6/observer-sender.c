@@ -27,6 +27,20 @@
  *
  */
 
+/**
+ * \file
+ *         White (observer) sender program for the dual network.
+ *         This program sends a messsage to the white sink whenever it is trigered via GPIO pin 1.0 by the connected black mote.
+ *
+ * \author
+ *         Marie-Paule Uwase
+ *         August 7, 2012
+ *         Roald Van Glabbeek
+ * 		     March 3, 2020
+ * 
+ *         Updated for newer contiki release en Zolertia Zoul (firefly) and IPv6
+ */
+
 #include "contiki.h"
 #include "sys/ctimer.h"
 #include "net/ip/uip.h"
@@ -39,6 +53,7 @@
 #include "dev/adc-zoul.h"
 #include <stdio.h>
 #include <string.h>
+#include <ctype.h>
 
 #include "dev/serial-line.h"
 #include "net/ipv6/uip-ds6-route.h"
@@ -55,7 +70,7 @@
  * Interval between consecutive probes of the triger bit P1.0
  */
 
-#define GPIO_READ_INTERVAL (CLOCK_SECOND/128)
+#define ADC_READ_INTERVAL (CLOCK_SECOND/128)
 
 /* 
  * Data structure of sent messages
@@ -91,7 +106,7 @@ AUTOSTART_PROCESSES(&observer_sender_process);
 /*--------------------------------------------------------------------------------
  * SETTING THE GPIOS
  *-------------------------------------------------------------------------------*/
-void test_callback(uint8_t port, uint8_t pin){
+void msg_callback(uint8_t port, uint8_t pin){
   send_packet(NULL);
 }
 void
@@ -110,7 +125,7 @@ GPIOS_init(void)
   GPIO_TRIGGER_SINGLE_EDGE(GPIO_A_BASE,GPIO_PIN_MASK(2));
   GPIO_DETECT_RISING(GPIO_A_BASE,GPIO_PIN_MASK(2));
   GPIO_ENABLE_INTERRUPT(GPIO_A_BASE,GPIO_PIN_MASK(2));
-  gpio_register_callback(test_callback, 0, 2);
+  gpio_register_callback(msg_callback, 0, 2);
 }
 /*---------------------------------------------------------------------------*/
 uint8_t
@@ -127,20 +142,6 @@ read_GPIOS(void)
 	if (GPIO_READ_PIN(GPIO_D_BASE,GPIO_PIN_MASK(2)))	blackseqno=blackseqno+32; 
 
 	return blackseqno;
-}
-
-/*---------------------------------------------------------------------------*/
-static void
-tcpip_handler(void)
-{
-  char *str;
-
-  if(uip_newdata()) {
-    str = uip_appdata;
-    str[uip_datalen()] = '\0';
-    //reply++;
-    //printf("DATA recv '%s' (s:%d, r:%d)\n", str, reply);
-  }
 }
 /*---------------------------------------------------------------------------*/
 static void
@@ -160,6 +161,9 @@ send_packet(void *ptr)
 			server_ipaddr.u8[sizeof(server_ipaddr.u8) - 1]);
 	uip_udp_packet_sendto(client_conn, &msg, sizeof(msg),
 							&server_ipaddr, UIP_HTONS(UDP_SERVER_PORT));
+
+  ADCResult=0;
+  counter=0;
 }
 /*---------------------------------------------------------------------------*/
 static void
@@ -254,18 +258,19 @@ PROCESS_THREAD(observer_sender_process, ev, data)
 	NETSTACK_RADIO.set_value(RADIO_PARAM_TXPOWER, power);
 
   // init ADC on A5, at 64 bit rate
-  adc_zoul.configure(SENSORS_HW_INIT,ZOUL_SENSORS_ADC3);
+  adc_init();
+  adc_zoul.configure(SENSORS_HW_INIT,ZOUL_SENSORS_ADC1);
   adc_zoul.configure(ZOUL_SENSORS_CONFIGURE_TYPE_DECIMATION_RATE, SOC_ADC_ADCCON_DIV_64);
 
 	GPIOS_init();
   counter = 0;
 
-  etimer_set(&periodic, GPIO_READ_INTERVAL);
+  etimer_set(&periodic, ADC_READ_INTERVAL);
   while(1) {
     PROCESS_WAIT_UNTIL(etimer_expired(&periodic));
 
 		counter++;
-		int ADC_val = adc_zoul.value(ZOUL_SENSORS_ADC3);
+		int ADC_val = adc_zoul.value(ZOUL_SENSORS_ADC1);
 		ADCResult += ADC_val;
     printf("%d\n",ADC_val);
     etimer_reset(&periodic);
