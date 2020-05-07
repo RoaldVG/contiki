@@ -49,15 +49,8 @@ static uint16_t received = 0 ;
 //int8_t lqi_val ;
 int16_t rssi_val ;
 
-/* Altough it doesn't have anything to do every 10 seconds this timer is needed in order 
- * for the receiver to work ???
- */
-#define TMP102_READ_INTERVAL (CLOCK_SECOND*10)
-
-/*
- * Duration of the triger bit P1.0 for communicating with the white mote
- */
-#define PULSEWIDTH 2  // Two ticks of the clock counting 128 ticks/s
+// Bit-width of IO communication with observer
+#define IO_WIDTH 11
 
 void tell_white (void);
 
@@ -81,52 +74,39 @@ struct testmsg msg;
 void
 GPIOS_init(void)
 {
-	/*
-	//configuring pin as GPIO
+	GPIO_SET_OUTPUT(GPIO_A_BASE,GPIO_PIN_MASK(6));		//GPIO PA6
+	GPIO_SET_OUTPUT(GPIO_A_BASE,GPIO_PIN_MASK(7));		//GPIO PA7
+  
+ 	GPIO_SET_OUTPUT(GPIO_C_BASE,GPIO_PIN_MASK(0));		//GPIO PC0
+	GPIO_SET_OUTPUT(GPIO_C_BASE,GPIO_PIN_MASK(1));		//GPIO PC1
+  	GPIO_SET_OUTPUT(GPIO_C_BASE,GPIO_PIN_MASK(2));		//GPIO PC2
+  	GPIO_SET_OUTPUT(GPIO_C_BASE,GPIO_PIN_MASK(3));		//GPIO PC3
+	GPIO_SET_OUTPUT(GPIO_C_BASE,GPIO_PIN_MASK(4));		//GPIO PC4
+	GPIO_SET_OUTPUT(GPIO_C_BASE,GPIO_PIN_MASK(5));		//GPIO PC5
+  	GPIO_SET_OUTPUT(GPIO_C_BASE,GPIO_PIN_MASK(6));		//GPIO PC6
 
-	P1SEL &= ~0xC1;			//GPIO P1.0 P1.6 P1.7
-	P2SEL &= ~0x08;			//GPIO P2.3 
-	P4SEL &= ~0x0D;			//GPIO P4.0 P4.2 P4.3
-
-	//configuring pin as OUTPUT
-
-	P1DIR |= 0xC1;                  //GPIO P1.0 P1.6 P1.7
-	P2DIR |= 0x08;                  //GPIO P2.3              
-	P4DIR |= 0x0D;                  //GPIO P4.0 P4.2 P4.3
-	*/
-
-	GPIO_SET_OUTPUT(GPIO_PORT_TO_BASE(0),GPIO_PIN_MASK(2));		//GPIO PA2
-	GPIO_SET_OUTPUT(GPIO_PORT_TO_BASE(2),GPIO_PIN_MASK(0));		//GPIO PC0
-	GPIO_SET_OUTPUT(GPIO_PORT_TO_BASE(2),GPIO_PIN_MASK(1));		//GPIO PC1
-	GPIO_SET_OUTPUT(GPIO_PORT_TO_BASE(2),GPIO_PIN_MASK(4));		//GPIO PC4
-	GPIO_SET_OUTPUT(GPIO_PORT_TO_BASE(2),GPIO_PIN_MASK(5));		//GPIO PC5
-	GPIO_SET_OUTPUT(GPIO_PORT_TO_BASE(3),GPIO_PIN_MASK(1));		//GPIO PD1
-	GPIO_SET_OUTPUT(GPIO_PORT_TO_BASE(3),GPIO_PIN_MASK(2));		//GPIO PD2
+	GPIO_SET_OUTPUT(GPIO_D_BASE,GPIO_PIN_MASK(0));		//GPIO PD0
+  	GPIO_SET_OUTPUT(GPIO_D_BASE,GPIO_PIN_MASK(1));		//GPIO PD1
+	GPIO_SET_OUTPUT(GPIO_D_BASE,GPIO_PIN_MASK(2));		//GPIO PD2
 }
 
 void
 clear_GPIOS(void)
 {
-//clear all output pins
-    /*
-	P1OUT &= ~BIT0;     //P1.0 AS 0
-	P1OUT &= ~BIT6;		//P1.6 AS 0
-	P1OUT &= ~BIT7;		//P1.7 AS 0
+	GPIO_CLR_PIN(GPIO_A_BASE,GPIO_PIN_MASK(6));		//GPIO PA6
+	//GPIO_CLR_PIN(GPIO_A_BASE,GPIO_PIN_MASK(7));		//GPIO PA7
+	
+ 	GPIO_CLR_PIN(GPIO_C_BASE,GPIO_PIN_MASK(0));		//GPIO PC0
+	GPIO_CLR_PIN(GPIO_C_BASE,GPIO_PIN_MASK(1));		//GPIO PC1
+  	GPIO_CLR_PIN(GPIO_C_BASE,GPIO_PIN_MASK(2));		//GPIO PC2
+  	GPIO_CLR_PIN(GPIO_C_BASE,GPIO_PIN_MASK(3));		//GPIO PC3
+	GPIO_CLR_PIN(GPIO_C_BASE,GPIO_PIN_MASK(4));		//GPIO PC4
+	GPIO_CLR_PIN(GPIO_C_BASE,GPIO_PIN_MASK(5));		//GPIO PC5
+  	GPIO_CLR_PIN(GPIO_C_BASE,GPIO_PIN_MASK(6));		//GPIO PC6
 
-	P2OUT &= ~BIT3;		//P2.3 AS 0
-
-	P4OUT &= ~BIT0;		//P4.0 AS 0
-	P4OUT &= ~BIT2;		//P4.2 AS 0
-	P4OUT &= ~BIT3;		//P4.3 AS 0
-	*/
-
-	GPIO_CLR_PIN(GPIO_PORT_TO_BASE(0),GPIO_PIN_MASK(2));		//GPIO PA2
-	GPIO_CLR_PIN(GPIO_PORT_TO_BASE(2),GPIO_PIN_MASK(0));		//GPIO PC0
-	GPIO_CLR_PIN(GPIO_PORT_TO_BASE(2),GPIO_PIN_MASK(1));		//GPIO PC1
-	GPIO_CLR_PIN(GPIO_PORT_TO_BASE(2),GPIO_PIN_MASK(4));		//GPIO PC4
-	GPIO_CLR_PIN(GPIO_PORT_TO_BASE(2),GPIO_PIN_MASK(5));		//GPIO PC5
-	GPIO_CLR_PIN(GPIO_PORT_TO_BASE(3),GPIO_PIN_MASK(1));		//GPIO PD1
-	GPIO_CLR_PIN(GPIO_PORT_TO_BASE(3),GPIO_PIN_MASK(2));		//GPIO PD2
+	GPIO_CLR_PIN(GPIO_D_BASE,GPIO_PIN_MASK(0));		//GPIO PD0
+  	GPIO_CLR_PIN(GPIO_D_BASE,GPIO_PIN_MASK(1));		//GPIO PD1
+	GPIO_CLR_PIN(GPIO_D_BASE,GPIO_PIN_MASK(2));		//GPIO PD2
 }
 
 // This is the receiver interrupt handler
@@ -156,37 +136,28 @@ void tell_white (void)
 /*
  *      convert seqno into bits and set the GPIO bits accordingly
  */
-	static uint8_t seqno_bits[6];			
+	static uint8_t seqno_bits[IO_WIDTH];			
 	uint8_t i;
-
-	for (i = 0; i < 6; i++) {
+	for (i = 0; i < IO_WIDTH; i++) {
 		seqno_bits[i] = msg.blackseqno & (1 << i) ? 1 : 0;
 	}		//least significant bit in seqno_bits[0]
 
-	/*
-	if ( seqno_bits[0]==1 )	P1OUT |= BIT6;       //  write a 1 in P1.6
-	if ( seqno_bits[1]==1 )	P1OUT |= BIT7;       //  write a 1 in P1.7
-	if ( seqno_bits[2]==1 )	P2OUT |= BIT3;       //  write a 1 in P2.3
-	if ( seqno_bits[3]==1 )	P4OUT |= BIT0;       //  write a 1 in P4.0
-	if ( seqno_bits[4]==1 )	P4OUT |= BIT2;       //  write a 1 in P4.2
-	if ( seqno_bits[5]==1 )	P4OUT |= BIT3;       //  write a 1 in P4.3
-	*/
-
-	if ( seqno_bits[0]==1 )	GPIO_SET_PIN(GPIO_PORT_TO_BASE(2),GPIO_PIN_MASK(0));       //  write a 1 in C0
-	if ( seqno_bits[1]==1 )	GPIO_SET_PIN(GPIO_PORT_TO_BASE(2),GPIO_PIN_MASK(1));       //  write a 1 in C1
-	if ( seqno_bits[2]==1 )	GPIO_SET_PIN(GPIO_PORT_TO_BASE(2),GPIO_PIN_MASK(4));       //  write a 1 in C4
-	if ( seqno_bits[3]==1 )	GPIO_SET_PIN(GPIO_PORT_TO_BASE(2),GPIO_PIN_MASK(5));       //  write a 1 in C5
-	if ( seqno_bits[4]==1 )	GPIO_SET_PIN(GPIO_PORT_TO_BASE(3),GPIO_PIN_MASK(1));       //  write a 1 in D1
-	if ( seqno_bits[5]==1 )	GPIO_SET_PIN(GPIO_PORT_TO_BASE(3),GPIO_PIN_MASK(2));       //  write a 1 in D2
-/*
- *          set P1.0 to trigger reading by white mote
- */            
-        //P1OUT |= BIT0; 
-		GPIO_SET_PIN(GPIO_PORT_TO_BASE(0),GPIO_PIN_MASK(2));       //  write a 1 in A2
-/*
- *      leave time for the white mote to read the GPIO.
- */
-//        etimer_set(&et2, PULSEWIDTH);  
+	if ( seqno_bits[0]==1 )		GPIO_SET_PIN(GPIO_A_BASE,GPIO_PIN_MASK(6));       //  write a 1 in A6
+	if ( seqno_bits[1]==1 )		GPIO_SET_PIN(GPIO_C_BASE,GPIO_PIN_MASK(0));       //  write a 1 in C0
+	if ( seqno_bits[2]==1 )		GPIO_SET_PIN(GPIO_C_BASE,GPIO_PIN_MASK(1));       //  write a 1 in C1
+	if ( seqno_bits[3]==1 )		GPIO_SET_PIN(GPIO_C_BASE,GPIO_PIN_MASK(2));       //  write a 1 in C2
+	if ( seqno_bits[4]==1 )		GPIO_SET_PIN(GPIO_C_BASE,GPIO_PIN_MASK(3));       //  write a 1 in C3
+	if ( seqno_bits[5]==1 )		GPIO_SET_PIN(GPIO_C_BASE,GPIO_PIN_MASK(4));       //  write a 1 in C4
+	if ( seqno_bits[6]==1 )		GPIO_SET_PIN(GPIO_C_BASE,GPIO_PIN_MASK(5));       //  write a 1 in C5
+	if ( seqno_bits[7]==1 )		GPIO_SET_PIN(GPIO_C_BASE,GPIO_PIN_MASK(6));       //  write a 1 in C6
+	if ( seqno_bits[8]==1 )		GPIO_SET_PIN(GPIO_D_BASE,GPIO_PIN_MASK(0));       //  write a 1 in D0
+	if ( seqno_bits[9]==1 )		GPIO_SET_PIN(GPIO_D_BASE,GPIO_PIN_MASK(1));       //  write a 1 in D1
+	if ( seqno_bits[10]==1 )	GPIO_SET_PIN(GPIO_D_BASE,GPIO_PIN_MASK(2));       //  write a 1 in D2
+	
+	if (GPIO_READ_PIN(GPIO_PORT_TO_BASE(0),GPIO_PIN_MASK(7)) == 0)
+		GPIO_SET_PIN(GPIO_PORT_TO_BASE(0),GPIO_PIN_MASK(7));
+	else
+		GPIO_CLR_PIN(GPIO_PORT_TO_BASE(0),GPIO_PIN_MASK(7));
 	     
         flag_white=1;
 /*

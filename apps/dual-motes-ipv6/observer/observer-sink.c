@@ -71,14 +71,9 @@ static uint16_t received = 0 ;
 //int8_t lqi_val ;
 //int16_t rssi_val ;
 
-/* Altough it doesn't have anything to do every 10 seconds this timer is needed in order 
- * for the receiver to work ???
- */
-#define TMP102_READ_INTERVAL (CLOCK_SECOND*10)
-
 // Writes a title on the console
 struct whitemsg {
-	uint8_t  blackseqno;
+	uint16_t  blackseqno;
 	uint16_t whiteseqno;
 	uint32_t energy;
 	uint16_t counter_ADC;

@@ -65,6 +65,9 @@ uint16_t send = 0 ;
 
 #define ADC_READ_INTERVAL (CLOCK_SECOND/128)
 
+// Bit-width of IO communication with observer
+#define IO_WIDTH 11
+
 /* 
  * Data structure of sent messages
  */
@@ -74,7 +77,7 @@ uint32_t  counter=0;
 uint8_t   flag;
 
 struct whitemsg {
-	uint8_t  blackseqno;
+	uint16_t  blackseqno;
 	uint16_t whiteseqno;
 	uint32_t energy;
 	uint16_t counter_ADC;
@@ -97,9 +100,7 @@ AUTOSTART_PROCESSES(&temp_process);
  *-------------------------------------------------------------------------------*/
 void msg_callback(uint8_t port, uint8_t pin){
 	prepare_payload();
-	if(!linkaddr_cmp(&destination, &linkaddr_node_addr)) {
-		unicast_send(&uc, &destination);
-	}
+	unicast_send(&uc, &destination);
 
 	ADCResult=0;
 	counter=0;
@@ -107,34 +108,47 @@ void msg_callback(uint8_t port, uint8_t pin){
 void
 GPIOS_init(void)
 {
-	GPIO_SET_INPUT(GPIO_PORT_TO_BASE(2),GPIO_PIN_MASK(0));		//GPIO PC0
-	GPIO_SET_INPUT(GPIO_PORT_TO_BASE(2),GPIO_PIN_MASK(1));		//GPIO PC1
-	GPIO_SET_INPUT(GPIO_PORT_TO_BASE(2),GPIO_PIN_MASK(4));		//GPIO PC4
-	GPIO_SET_INPUT(GPIO_PORT_TO_BASE(2),GPIO_PIN_MASK(5));		//GPIO PC5
-	GPIO_SET_INPUT(GPIO_PORT_TO_BASE(3),GPIO_PIN_MASK(1));		//GPIO PD1
-	GPIO_SET_INPUT(GPIO_PORT_TO_BASE(3),GPIO_PIN_MASK(2));		//GPIO PD2
+	GPIO_SET_INPUT(GPIO_A_BASE,GPIO_PIN_MASK(6));		//GPIO PA6
+  
+ 	GPIO_SET_INPUT(GPIO_C_BASE,GPIO_PIN_MASK(0));		//GPIO PC0
+	GPIO_SET_INPUT(GPIO_C_BASE,GPIO_PIN_MASK(1));		//GPIO PC1
+  	GPIO_SET_INPUT(GPIO_C_BASE,GPIO_PIN_MASK(2));		//GPIO PC2
+  	GPIO_SET_INPUT(GPIO_C_BASE,GPIO_PIN_MASK(3));		//GPIO PC3
+	GPIO_SET_INPUT(GPIO_C_BASE,GPIO_PIN_MASK(4));		//GPIO PC4
+	GPIO_SET_INPUT(GPIO_C_BASE,GPIO_PIN_MASK(5));		//GPIO PC5
+  	GPIO_SET_INPUT(GPIO_C_BASE,GPIO_PIN_MASK(6));		//GPIO PC6
 
-	GPIO_SOFTWARE_CONTROL(GPIO_A_BASE,GPIO_PIN_MASK(2));
-	GPIO_SET_INPUT(GPIO_A_BASE,GPIO_PIN_MASK(2));
-	GPIO_DETECT_EDGE(GPIO_A_BASE,GPIO_PIN_MASK(2));
-	GPIO_TRIGGER_SINGLE_EDGE(GPIO_A_BASE,GPIO_PIN_MASK(2));
-	GPIO_DETECT_RISING(GPIO_A_BASE,GPIO_PIN_MASK(2));
-	GPIO_ENABLE_INTERRUPT(GPIO_A_BASE,GPIO_PIN_MASK(2));
-	gpio_register_callback(msg_callback, 0, 2);
+	GPIO_SET_INPUT(GPIO_D_BASE,GPIO_PIN_MASK(0));		//GPIO PD0
+  	GPIO_SET_INPUT(GPIO_D_BASE,GPIO_PIN_MASK(1));		//GPIO PD1
+	GPIO_SET_INPUT(GPIO_D_BASE,GPIO_PIN_MASK(2));		//GPIO PD2
+
+	GPIO_SOFTWARE_CONTROL(GPIO_A_BASE,GPIO_PIN_MASK(7));
+	GPIO_SET_INPUT(GPIO_A_BASE,GPIO_PIN_MASK(7));
+	GPIO_DETECT_EDGE(GPIO_A_BASE,GPIO_PIN_MASK(7));
+	//GPIO_TRIGGER_SINGLE_EDGE(GPIO_A_BASE,GPIO_PIN_MASK(7));
+	GPIO_TRIGGER_BOTH_EDGES(GPIO_A_BASE,GPIO_PIN_MASK(7));
+	//GPIO_DETECT_RISING(GPIO_A_BASE,GPIO_PIN_MASK(7));
+	GPIO_ENABLE_INTERRUPT(GPIO_A_BASE,GPIO_PIN_MASK(7));
+	gpio_register_callback(msg_callback, 0, 7);
 }
 
 uint8_t
 read_GPIOS(void)
 {
 	//reading the value in each pin
-	uint8_t  blackseqno=0;
+	uint16_t  blackseqno=0;
 
-	if (GPIO_READ_PIN(GPIO_PORT_TO_BASE(2),GPIO_PIN_MASK(0)))	blackseqno=blackseqno+1;		
-	if (GPIO_READ_PIN(GPIO_PORT_TO_BASE(2),GPIO_PIN_MASK(1)))    blackseqno=blackseqno+2;
-	if (GPIO_READ_PIN(GPIO_PORT_TO_BASE(2),GPIO_PIN_MASK(4)))	blackseqno=blackseqno+4; 
-	if (GPIO_READ_PIN(GPIO_PORT_TO_BASE(2),GPIO_PIN_MASK(5)))	blackseqno=blackseqno+8;
-	if (GPIO_READ_PIN(GPIO_PORT_TO_BASE(3),GPIO_PIN_MASK(1)))	blackseqno=blackseqno+16; 
-	if (GPIO_READ_PIN(GPIO_PORT_TO_BASE(3),GPIO_PIN_MASK(2)))	blackseqno=blackseqno+32; 
+	if (GPIO_READ_PIN(GPIO_A_BASE,GPIO_PIN_MASK(6)))	blackseqno=blackseqno+1;		
+	if (GPIO_READ_PIN(GPIO_C_BASE,GPIO_PIN_MASK(0)))    blackseqno=blackseqno+2;
+	if (GPIO_READ_PIN(GPIO_C_BASE,GPIO_PIN_MASK(1)))	blackseqno=blackseqno+4; 
+	if (GPIO_READ_PIN(GPIO_C_BASE,GPIO_PIN_MASK(2)))	blackseqno=blackseqno+8;
+	if (GPIO_READ_PIN(GPIO_C_BASE,GPIO_PIN_MASK(3)))	blackseqno=blackseqno+16; 
+	if (GPIO_READ_PIN(GPIO_C_BASE,GPIO_PIN_MASK(4)))	blackseqno=blackseqno+32; 
+	if (GPIO_READ_PIN(GPIO_C_BASE,GPIO_PIN_MASK(5)))    blackseqno=blackseqno+64;
+	if (GPIO_READ_PIN(GPIO_C_BASE,GPIO_PIN_MASK(6)))	blackseqno=blackseqno+128; 
+	if (GPIO_READ_PIN(GPIO_D_BASE,GPIO_PIN_MASK(0)))	blackseqno=blackseqno+256;
+	if (GPIO_READ_PIN(GPIO_D_BASE,GPIO_PIN_MASK(1)))	blackseqno=blackseqno+512; 
+	if (GPIO_READ_PIN(GPIO_D_BASE,GPIO_PIN_MASK(2)))	blackseqno=blackseqno+1024; 
 
 	return blackseqno;
 }
@@ -213,8 +227,8 @@ packet_send(void)
 
 	    unicast_send(&uc, &destination);
 
-    /*        printf(" Black= %u White= %u Energy= %li counter_ADC = %u App.time= %u\n",
-                     msg.blackseqno,msg.whiteseqno,msg.energy,msg.counter_ADC,msg.timestamp_app);*/
+            printf(" Black= %u White= %u Energy= %li counter_ADC = %u App.time= %u\n",
+                     msg.blackseqno,msg.whiteseqno,msg.energy,msg.counter_ADC,msg.timestamp_app);
 
             
 	}
@@ -266,7 +280,7 @@ PROCESS_THREAD(temp_process, ev, data)
 		counter++;
 		int ADC_val = adc_zoul.value(ZOUL_SENSORS_ADC1);
 		ADCResult += ADC_val;
-		printf("%d\n",ADC_val);
+		//printf("%d\n",ADC_val);
 		etimer_reset(&et);
 	}
 	PROCESS_END();
