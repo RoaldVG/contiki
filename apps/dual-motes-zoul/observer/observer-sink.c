@@ -18,6 +18,10 @@
 #include "net/rime/rime.h"
 #include "dev/leds.h"
 #include "core/net/netstack.h"
+#include "platform/zoul/contiki-conf.h"
+
+#define DEBUG DEBUG_FULL
+#include "net/ip/uip-debug.h"
 
 
 /* In Rime communicating nodes must agree on a 16 bit virtual
@@ -47,7 +51,7 @@ static uint16_t received = 0 ;
 
 // Writes a title on the console
 
-PROCESS(temp_process, "receiving messages from white motes");
+PROCESS(temp_process, "receiving messages from observing motes");
 AUTOSTART_PROCESSES(&temp_process);
 
 struct whitemsg {
@@ -72,8 +76,8 @@ recv_uc(struct unicast_conn *c, const linkaddr_t *from)
         
 
         /*output format:Msg_from|sink_seqno|black_seqno,|white_seqno|ENERGY|time_interval|*/
-	printf("%d,%d,%d,%d,%li,%d,%u,%u,%u,%u\n",
-					from->u8[0], received,msg.blackseqno,msg.whiteseqno,
+	PRINTF("%x:%x,%d,%d,%d,%li,%d,%u,%u,%u,%u\n\r",
+					from->u8[0],from->u8[1], received,msg.blackseqno,msg.whiteseqno,
                                         msg.energy,msg.counter_ADC, 
                                         msg.timestamp_app,msg.timestamp_mac,timestamp,rtime);
 }
@@ -91,6 +95,8 @@ PROCESS_THREAD(temp_process, ev, data)
 		  NETSTACK_RADIO.set_value(RADIO_PARAM_TXPOWER, power);
 /*        Start receiver                                       */
 	  unicast_open(&uc, channel, &unicast_callbacks);
+
+	  PRINTF("Channel: %d\n", CC2538_RF_CONF_CHANNEL);
 	
 	PROCESS_END();
 }

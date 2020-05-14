@@ -55,8 +55,8 @@ AUTOSTART_PROCESSES(&temp_process);
 struct testmsg {       
 	uint16_t  blackseqno;
 	uint16_t  timestamp_app;
-        char      padding[44];
-        uint16_t  timestamp_mac;        
+    char      padding[44];
+    uint16_t  timestamp_mac;        
 };
 
 /*--------------------------------------------------------------------------------
@@ -144,7 +144,7 @@ recv_uc(struct unicast_conn *c, const linkaddr_t *from)
  *    Print received message for control purposes
   		NETSTACK_RADIO.get_value(RADIO_PARAM_RSSI, rssi_val);
         rssi_val = ( cc2420_last_rssi ) - 45; 
-        printf("Rcvd = %5d from %4d, blcksqno = %5d length = % 3d, RSSI= %4d\n",received,from->u8[0], msg.blackseqno, sizeof(msg), rssi_val);
+        PRINTF("Rcvd = %5d from %4d, blcksqno = %5d length = % 3d, RSSI= %4d\n",received,from->u8[0], msg.blackseqno, sizeof(msg), rssi_val);
 */
 }
 
@@ -156,7 +156,7 @@ PROCESS_THREAD(temp_process, ev, data)
 {
 	PROCESS_BEGIN();
 
-printf("power level = %u, cca threshold = %d \n",power,cca_threshold);
+PRINTF("power level = %u, cca threshold = %d \n",power,cca_threshold);
 
 /* adjust power                                          */
 	NETSTACK_RADIO.set_value(RADIO_PARAM_TXPOWER,power);

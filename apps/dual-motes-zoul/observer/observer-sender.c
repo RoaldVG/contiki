@@ -27,13 +27,16 @@
 #include "dev/adc-zoul.h"
 #include "dev/zoul-sensors.h"
 
+#define DEBUG DEBUG_NONE
+#include "net/ip/uip-debug.h"
+
 //#include "dev/battery-sensor.h"
 
 /*
  * receiver mote id. (needs to be set in function of the destination)
  */
-uint8_t receiver0 = 118; //This is normally the white sink
-uint8_t receiver1 = 0;   //In this network the second byte of the rime addresses is not used.
+uint8_t receiver0 = 0xe4; //This is normally the white sink
+uint8_t receiver1 = 0xcc;   //In this network the second byte of the rime addresses is not used.
 linkaddr_t destination;
 
 /* In Rime communicating nodes must agree on a 16 bit virtual
@@ -77,7 +80,7 @@ uint32_t  counter=0;
 uint8_t   flag;
 
 struct whitemsg {
-	uint16_t  blackseqno;
+	uint16_t blackseqno;
 	uint16_t whiteseqno;
 	uint32_t energy;
 	uint16_t counter_ADC;
@@ -132,7 +135,7 @@ GPIOS_init(void)
 	gpio_register_callback(msg_callback, 0, 7);
 }
 
-uint8_t
+uint16_t
 read_GPIOS(void)
 {
 	//reading the value in each pin
@@ -148,7 +151,7 @@ read_GPIOS(void)
 	if (GPIO_READ_PIN(GPIO_C_BASE,GPIO_PIN_MASK(6)))	blackseqno=blackseqno+128; 
 	if (GPIO_READ_PIN(GPIO_D_BASE,GPIO_PIN_MASK(0)))	blackseqno=blackseqno+256;
 	if (GPIO_READ_PIN(GPIO_D_BASE,GPIO_PIN_MASK(1)))	blackseqno=blackseqno+512; 
-	if (GPIO_READ_PIN(GPIO_D_BASE,GPIO_PIN_MASK(2)))	blackseqno=blackseqno+1024; 
+	if (GPIO_READ_PIN(GPIO_D_BASE,GPIO_PIN_MASK(2)))	blackseqno=blackseqno+1024;
 
 	return blackseqno;
 }
@@ -160,7 +163,7 @@ read_GPIOS(void)
 static void
 recv_uc(struct unicast_conn *c, const linkaddr_t *from)
 {
-	/*printf("unicast message received from %d.%d\n",
+	/*PRINTF("unicast message received from %d.%d\n",
 			from->u8[0], from->u8[1]);*/
 }
 
@@ -194,7 +197,7 @@ prepare_payload( void )
 	packetbuf_set_attr(PACKETBUF_ATTR_PACKET_TYPE,
 			PACKETBUF_ATTR_PACKET_TYPE_TIMESTAMP);
 
-	printf("Sending to %x.%x\n",destination.u8[0],destination.u8[1]);
+	printf("Sending packet %d with seqno %d to %x.%x\n",msg.whiteseqno,msg.blackseqno, destination.u8[0],destination.u8[1]);
 }
 /*---------------------------------------------------------------------------*/
 void
@@ -227,7 +230,7 @@ packet_send(void)
 
 	    unicast_send(&uc, &destination);
 
-            printf(" Black= %u White= %u Energy= %li counter_ADC = %u App.time= %u\n",
+            PRINTF(" Black= %u White= %u Energy= %li counter_ADC = %u App.time= %u\n",
                      msg.blackseqno,msg.whiteseqno,msg.energy,msg.counter_ADC,msg.timestamp_app);
 
             
@@ -269,7 +272,7 @@ PROCESS_THREAD(temp_process, ev, data)
 	destination.u8[1] = receiver1;
 
 	/* Configure the ADC ports */
-  	adc_zoul.configure(SENSORS_HW_INIT, ZOUL_SENSORS_ADC1);
+  	adc_zoul.configure(SENSORS_HW_INIT, ZOUL_SENSORS_ADC2);
 	adc_zoul.configure(ZOUL_SENSORS_CONFIGURE_TYPE_DECIMATION_RATE, SOC_ADC_ADCCON_DIV_64);
 	while(1)
 	{
@@ -278,9 +281,10 @@ PROCESS_THREAD(temp_process, ev, data)
 		PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&et));
 
 		counter++;
-		int ADC_val = adc_zoul.value(ZOUL_SENSORS_ADC1);
-		ADCResult += ADC_val;
+		int ADC_val = adc_zoul.value(ZOUL_SENSORS_ADC2);
 		//printf("%d\n",ADC_val);
+		ADCResult += ADC_val;
+		//PRINTF("%d\n",ADC_val);
 		etimer_reset(&et);
 	}
 	PROCESS_END();

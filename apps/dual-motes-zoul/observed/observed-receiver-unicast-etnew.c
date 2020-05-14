@@ -127,7 +127,7 @@ recv_uc(struct unicast_conn *c, const linkaddr_t *from)
  */
 	NETSTACK_RADIO.get_value(RADIO_PARAM_RSSI, rssi_val);
 	//rssi_val = ( cc2420_last_rssi ) - 45;
-	printf("unicast Rcvd = %5d from %4d, blcksqno = %5d length = % 3d, RSSI= %4d\n",received,from->u8[0], msg.blackseqno, sizeof(msg), rssi_val);
+	PRINTF("unicast Rcvd = %5d from %4d, blcksqno = %5d length = % 3d, RSSI= %4d\n",received,from->u8[0], msg.blackseqno, sizeof(msg), rssi_val);
 
 }
 
@@ -167,8 +167,8 @@ void tell_white (void)
 }
 
 
-   // printf(" seqno %u %u %u %u %u %u \n",seqno_bits[0],seqno_bits[1],seqno_bits[2],seqno_bits[3],seqno_bits[4],seqno_bits[5]);
-   // printf(" READ_GPIOS %u \n",read_GPIOS());
+   // PRINTF(" seqno %u %u %u %u %u %u \n",seqno_bits[0],seqno_bits[1],seqno_bits[2],seqno_bits[3],seqno_bits[4],seqno_bits[5]);
+   // PRINTF(" READ_GPIOS %u \n",read_GPIOS());
 
 static const struct unicast_callbacks unicast_callbacks = {recv_uc};
 static struct unicast_conn uc;
@@ -178,7 +178,7 @@ PROCESS_THREAD(temp_process, ev, data)
 {
 	PROCESS_BEGIN();
 
-        printf("Begin of process \n");
+        PRINTF("Begin of process \n");
 
 	// adjust power
 	NETSTACK_RADIO.set_value(RADIO_PARAM_TXPOWER,power);

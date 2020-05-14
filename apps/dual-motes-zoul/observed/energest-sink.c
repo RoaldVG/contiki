@@ -19,6 +19,7 @@
 #include "net/rime/rime.h"
 #include "dev/leds.h"
 #include "core/net/netstack.h"
+#include "platform/zoul/contiki-conf.h"
 
 #define DEBUG DEBUG_FULL
 #include "net/ip/uip-debug.h"
@@ -60,6 +61,7 @@ struct energestmsg {
 	uint32_t 	transmit;
 	uint32_t 	listen;
 	uint16_t 	seqno;
+	uint32_t	totaltime;
 };
 
 // This is the receiver function
@@ -75,8 +77,8 @@ recv_uc(struct unicast_conn *c, const linkaddr_t *from)
         
 
         /*output format:Msg_from|sink_seqno|black_seqno,|white_seqno|ENERGY|time_interval|*/
-	printf("%x:%x,%" PRIu16 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 "\n",
-		from->u8[0], from->u8[1], msg.seqno, msg.cpu, msg.lpm, msg.transmit, msg.listen);
+	printf("%x:%x,%" PRIu16 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32"\n\r",
+		from->u8[0], from->u8[1], msg.seqno, msg.cpu, msg.lpm, msg.transmit, msg.listen, msg.totaltime);
 
 }
 
@@ -93,6 +95,7 @@ PROCESS_THREAD(temp_process, ev, data)
 		  NETSTACK_RADIO.set_value(RADIO_PARAM_TXPOWER, power);
 /*        Start receiver                                       */
 	  unicast_open(&uc, channel, &unicast_callbacks);
+	  printf("Channel: %d\n", CC2538_RF_CONF_CHANNEL);
 	
 	PROCESS_END();
 }

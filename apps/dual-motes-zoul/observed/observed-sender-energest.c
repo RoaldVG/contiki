@@ -24,6 +24,9 @@
 #include "core/net/netstack.h"
 #include "cpu/cc2538/dev/gpio.h"
 
+#define DEBUG DEBUG_NULL
+#include "net/ip/uip-debug.h"
+
 
 /* In Rime communicating nodes must agree on a 16 bit virtual
  * channel number. For each virtual channel one can define 
@@ -43,12 +46,14 @@ uint8_t power = 31;
 uint8_t receiver = 211;
 linkaddr_t destination;
 
+linkaddr_t energest_rx;
+void prepare_energest( void );
+
 // message counters
-uint16_t send = 0 ;
+uint16_t send = 0;
 
 static void recv_uc(struct unicast_conn *c, const linkaddr_t *from);
 static void sent_uc(struct unicast_conn *c, int status, int num_tx);
-
 static const struct unicast_callbacks unicast_callbacks = {sent_uc, recv_uc};
 static struct unicast_conn uc;
 
@@ -58,7 +63,7 @@ static struct unicast_conn uc;
 /* Selection of the time interval between messages */
 
 #define AVERAGE_SEND_INTERVAL CLOCK_SECOND
-#define RANDOM 1
+#define RANDOM 0
 #define MIN_SEND_INTERVAL 1
 #define INTERVAL_RANGE (AVERAGE_SEND_INTERVAL - MIN_SEND_INTERVAL) * 2 
 
@@ -76,13 +81,20 @@ static struct unicast_conn uc;
 struct testmsg {       
 	uint16_t  blackseqno;
 	uint16_t  timestamp_app;
-	uint16_t cpu;
-	uint16_t lpm;
-	uint16_t transmit;
-	uint16_t listen;
     char      padding[82];
     uint16_t  timestamp_mac;
 };
+
+struct energestmsg {
+	uint32_t 	cpu;
+	uint32_t 	lpm;
+	uint32_t 	transmit;
+	uint32_t 	listen;
+	uint16_t 	seqno;
+	uint32_t	totaltime;
+};
+
+struct energestmsg prev_energest_vals;
 
 uint16_t seqno=0;
 
@@ -141,7 +153,7 @@ clear_GPIOS(void)
 static void
 recv_uc(struct unicast_conn *c, const linkaddr_t *from)
 {
-	//printf("unicast message received from %d.%d\n",
+	//PRINTF("unicast message received from %d.%d\n",
 	//		from->u8[0], from->u8[1]);
 }
 
@@ -149,8 +161,6 @@ recv_uc(struct unicast_conn *c, const linkaddr_t *from)
 void
 prepare_payload( void )
 {
-	unsigned long cpu, lpm, transmit, listen;
-	static unsigned long last_cpu, last_lpm, last_transmit, last_listen;
 	struct testmsg msg;
 
 		//seqno = (seqno < ((2<<(IO_WIDTH+1))-1) ? seqno++ : 0);
@@ -162,28 +172,6 @@ prepare_payload( void )
 	/*Set general info*/
 	msg.blackseqno=seqno;		
 	msg.timestamp_app= clock_time();
-	energest_flush();
-
-	cpu = energest_type_time(ENERGEST_TYPE_CPU) - last_cpu;
-	lpm = energest_type_time(ENERGEST_TYPE_LPM) - last_lpm;
-	transmit = energest_type_time(ENERGEST_TYPE_TRANSMIT) - last_transmit;
-	listen = energest_type_time(ENERGEST_TYPE_LISTEN) - last_listen;
-
-	/* Make sure that the values are within 16 bits. If they are larger,
-					we scale them down to fit into 16 bits. */
-	while(cpu >= 65536ul || lpm >= 65536ul ||
-				transmit >= 65536ul || listen >= 65536ul) {
-		cpu = cpu >> 1;
-		lpm = lpm >> 1;
-		transmit = transmit >> 2;
-		listen = listen >> 2;
-		}
-
-	msg.cpu = cpu;
-	msg.lpm = lpm;
-	msg.transmit = transmit;
-	msg.listen = listen;
-
 	/*
 	*      convert seqno into bits and set the GPIO bits accordingly
 	*/
@@ -214,14 +202,7 @@ prepare_payload( void )
 		GPIO_CLR_PIN(GPIO_PORT_TO_BASE(0),GPIO_PIN_MASK(7));
 
 	packetbuf_copyfrom(&msg, sizeof(msg));
-	packetbuf_set_attr(PACKETBUF_ATTR_PACKET_TYPE,
-				PACKETBUF_ATTR_PACKET_TYPE_TIMESTAMP);
-
-	last_cpu = energest_type_time(ENERGEST_TYPE_CPU);
-	last_lpm = energest_type_time(ENERGEST_TYPE_LPM);
-	last_transmit = energest_type_time(ENERGEST_TYPE_TRANSMIT);
-	last_listen = energest_type_time(ENERGEST_TYPE_LISTEN);
-	//printf(" energest values: %u %u %u %u \n", msg.cpu, msg.lpm, msg.transmit, msg.listen);
+	packetbuf_set_attr(PACKETBUF_ATTR_PACKET_TYPE, PACKETBUF_ATTR_PACKET_TYPE_TIMESTAMP);
 }
 /*---------------------------------------------------------------------------*/
 static void
@@ -237,6 +218,32 @@ sent_uc(struct unicast_conn *c, int status, int num_tx)
  *-------------------------------------------------------------------------------*/
 
 /*-------------------------------------------------------------------------------*/
+void
+prepare_energest( void )
+{
+	struct energestmsg energest_values;
+
+	PRINTF("Sending to energest sink %x:%x\n",energest_rx.u8[0],energest_rx.u8[1]);
+
+	energest_values.totaltime = RTIMER_NOW() - prev_energest_vals.totaltime;
+
+	energest_flush();
+	energest_values.cpu = energest_type_time(ENERGEST_TYPE_CPU) - prev_energest_vals.cpu;
+	energest_values.lpm = energest_type_time(ENERGEST_TYPE_LPM) - prev_energest_vals.lpm;
+	energest_values.transmit = energest_type_time(ENERGEST_TYPE_TRANSMIT) - prev_energest_vals.transmit;
+	energest_values.listen = energest_type_time(ENERGEST_TYPE_LISTEN) - prev_energest_vals.listen;
+	energest_values.seqno = seqno;
+	
+	
+	packetbuf_copyfrom(&energest_values, sizeof(energest_values));
+	packetbuf_set_attr(PACKETBUF_ATTR_PACKET_TYPE, PACKETBUF_ATTR_PACKET_TYPE_TIMESTAMP);
+
+	prev_energest_vals.cpu = energest_values.cpu;
+	prev_energest_vals.lpm = energest_values.lpm;
+	prev_energest_vals.transmit = energest_values.transmit;
+	prev_energest_vals.listen = energest_values.listen;
+	prev_energest_vals.totaltime = energest_values.totaltime;
+}
 
 static struct etimer et;
 
@@ -252,8 +259,19 @@ PROCESS_THREAD(temp_process, ev, data)
 	GPIOS_init();
 	unicast_open(&uc, channel, &unicast_callbacks);
 
-	destination.u8[0] = 0xde;
-	destination.u8[1] = 0xae;
+	destination.u8[0] = 0xe5;
+	destination.u8[1] = 0xe4;
+
+	energest_rx.u8[0] = 0x9b;
+	energest_rx.u8[1] = 0xf3;
+
+	prev_energest_vals.cpu = 0;
+	prev_energest_vals.lpm = 0;
+	prev_energest_vals.transmit = 0;
+	prev_energest_vals.listen = 0;
+	prev_energest_vals.seqno = 0;
+	prev_energest_vals.totaltime = 0;
+
 
 	while(1)
 	{
@@ -262,9 +280,14 @@ PROCESS_THREAD(temp_process, ev, data)
   
 		PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&et));
 
-		printf("Send interval: %u; Seqno: %u\n",SEND_INTERVAL, seqno);
+		PRINTF("Send interval: %u; Seqno: %u\n",SEND_INTERVAL, seqno);
 
-		clear_GPIOS();
+		if (seqno%100==0){
+			prepare_energest();
+			unicast_send(&uc,&energest_rx);
+		}
+
+		//clear_GPIOS();
 		prepare_payload();
 		if(!linkaddr_cmp(&destination, &linkaddr_node_addr)) {
       		unicast_send(&uc, &destination);

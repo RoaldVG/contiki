@@ -214,8 +214,8 @@ PRINTF("power level = %u, cca threshold = %d \n",power,cca_threshold);
 
 	GPIOS_init();
 
-	energest_rx.u8[0] = 0x9d;
-	energest_rx.u8[1] = 0xc7;
+	energest_rx.u8[0] = 0x9b;
+	energest_rx.u8[1] = 0xf3;
 
 	prev_energest_vals.cpu = 0;
 	prev_energest_vals.lpm = 0;
