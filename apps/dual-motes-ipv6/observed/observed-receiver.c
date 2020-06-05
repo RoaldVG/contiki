@@ -44,15 +44,14 @@
 #include "contiki-lib.h"
 #include "contiki-net.h"
 #include "net/ip/uip.h"
-#include "net/rpl/rpl.h"
+//#include "net/rpl/rpl.h"
+#include "project-conf.h"
 
 #include "net/netstack.h"
 #include <stdio.h>
 #include <string.h>
 
 #include "dev/gpio.h"
-
-#include "simple-udp.h"
 
 #define DEBUG DEBUG_FULL
 #include "net/ip/uip-debug.h"
@@ -93,7 +92,7 @@ struct energestmsg prev_energest_vals;
 
 static struct uip_udp_conn *server_conn;
 //static struct simple_udp_connection main_conn;
-static uip_ipaddr_t server_ipaddr;
+//static uip_ipaddr_t server_ipaddr;
 //static struct uip_udp_conn *energest_conn;
 //static struct simple_udp_connection energest_conn;
 static uip_ipaddr_t energest_ipaddr;
@@ -235,7 +234,7 @@ print_local_addresses(void)
 PROCESS_THREAD(observed_receiver_process, ev, data)
 {
     uip_ipaddr_t ipaddr;
-    struct uip_ds6_addr *root_if;
+    //struct uip_ds6_addr *root_if;
 
     PROCESS_BEGIN();
 
@@ -272,7 +271,7 @@ PROCESS_THREAD(observed_receiver_process, ev, data)
 #endif
 
     uip_ds6_addr_add(&ipaddr, 0, ADDR_MANUAL);
-    
+    /*
     root_if = uip_ds6_addr_lookup(&ipaddr);
     if(root_if != NULL) {
         rpl_dag_t *dag;
@@ -283,7 +282,7 @@ PROCESS_THREAD(observed_receiver_process, ev, data)
     } else {
         PRINTF("failed to create a new RPL DAG\n");
     }
-    
+    */
 #endif /* UIP_CONF_ROUTER */
   
     print_local_addresses();
@@ -331,7 +330,7 @@ PROCESS_THREAD(observed_receiver_process, ev, data)
         
         if(ev == tcpip_event) {
             tcpip_handler();
-            if (received%5 == 0)
+            if (received%7 == 0)
                 send_energest();
         }
         

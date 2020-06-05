@@ -86,13 +86,7 @@ struct energestmsg {
 // This is the receiver function
 /*---------------------------------------------------------------------------*/
 static void
-tcpip_handler(struct simple_udp_connection *c,
-         const uip_ipaddr_t *sender_addr,
-         uint16_t sender_port,
-         const uip_ipaddr_t *receiver_addr,
-         uint16_t receiver_port,
-         const uint8_t *data,
-         uint16_t datalen)
+tcpip_handler()
 {
     rtimer_clock_t rtime = RTIMER_NOW();		//received time (for the latency)
 	struct energestmsg *msg;
@@ -181,7 +175,7 @@ PROCESS_THREAD(white_sink_process, ev, data)
 
     /* The data sink runs with a 100% duty cycle in order to ensure high 
         packet reception rates. */
-    NETSTACK_MAC.off(1);
+    //NETSTACK_MAC.off(1);
     
     server_conn = udp_new(NULL, 0, NULL);
     if(server_conn == NULL) {
@@ -198,9 +192,9 @@ PROCESS_THREAD(white_sink_process, ev, data)
     //simple_udp_register(&conn, UDP_LOCAL_PORT, NULL, UDP_LOCAL_PORT, tcpip_handler);
     while(1) {
         PROCESS_YIELD();
-        /*if(ev == tcpip_event) {
+        if(ev == tcpip_event) {
         tcpip_handler();
-        }*/
+        }
     }
 
     PROCESS_END();

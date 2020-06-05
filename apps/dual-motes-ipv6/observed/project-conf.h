@@ -1,0 +1,10 @@
+#ifndef PROJECT_CONF_H_
+#define PROJECT_CONF_H_
+
+#define NETSTACK_CONF_RDC contikimac_driver
+#define NETSTACK_CONF_RDC_CHANNEL_CHECK_RATE 4
+#define UART_CONF_ENABLE 1
+
+//#undef UIP_CONF_IPV6_RPL
+#define CONTIKI_WITH_RPL 0
+#endif /* PROJECT_CONF_H_ */
