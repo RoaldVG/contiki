@@ -1,4 +1,4 @@
-CONTIKI = ../..
+CONTIKI = ../../..
 
 ifndef TARGET
 TARGET=zoul
@@ -11,7 +11,7 @@ endif
 
 all: observer-sender observer-sink
 
-CFLAGS += -DNETSTACK_CONF_RADIO=cc1200_driver -DNETSTACK_CONF_MAC=nullmac_driver -DNETSTACK_CONF_RDC=nullrdc_driver
+CFLAGS += -DRF_CHANNEL=20 -DNETSTACK_CONF_MAC=nullmac_driver -DNETSTACK_CONF_RDC=nullrdc_driver -DUART_CONF_ENABLE=1
 
 CONTIKI_WITH_IPV6 = 1
 include $(CONTIKI)/Makefile.include

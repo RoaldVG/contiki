@@ -81,7 +81,7 @@
 uint16_t  whiteseqno=0;
 uint32_t  ADCResult=0;
 uint32_t  counter=0;
-uint8_t   flag;
+//uint8_t   flag;
 
 struct whitemsg {
 	uint16_t  blackseqno;
@@ -118,16 +118,16 @@ GPIOS_init(void)
 {
 	GPIO_SET_INPUT(GPIO_A_BASE,GPIO_PIN_MASK(6));		//GPIO PA6
   
-  GPIO_SET_INPUT(GPIO_C_BASE,GPIO_PIN_MASK(0));		//GPIO PC0
+    GPIO_SET_INPUT(GPIO_C_BASE,GPIO_PIN_MASK(0));		//GPIO PC0
 	GPIO_SET_INPUT(GPIO_C_BASE,GPIO_PIN_MASK(1));		//GPIO PC1
-  GPIO_SET_INPUT(GPIO_C_BASE,GPIO_PIN_MASK(2));		//GPIO PC2
-  GPIO_SET_INPUT(GPIO_C_BASE,GPIO_PIN_MASK(3));		//GPIO PC3
+    GPIO_SET_INPUT(GPIO_C_BASE,GPIO_PIN_MASK(2));		//GPIO PC2
+    GPIO_SET_INPUT(GPIO_C_BASE,GPIO_PIN_MASK(3));		//GPIO PC3
 	GPIO_SET_INPUT(GPIO_C_BASE,GPIO_PIN_MASK(4));		//GPIO PC4
 	GPIO_SET_INPUT(GPIO_C_BASE,GPIO_PIN_MASK(5));		//GPIO PC5
-  GPIO_SET_INPUT(GPIO_C_BASE,GPIO_PIN_MASK(6));		//GPIO PC6
+    GPIO_SET_INPUT(GPIO_C_BASE,GPIO_PIN_MASK(6));		//GPIO PC6
 
 	GPIO_SET_INPUT(GPIO_D_BASE,GPIO_PIN_MASK(0));		//GPIO PD0
-  GPIO_SET_INPUT(GPIO_D_BASE,GPIO_PIN_MASK(1));		//GPIO PD1
+    GPIO_SET_INPUT(GPIO_D_BASE,GPIO_PIN_MASK(1));		//GPIO PD1
 	GPIO_SET_INPUT(GPIO_D_BASE,GPIO_PIN_MASK(2));		//GPIO PD2
 
 	GPIO_SOFTWARE_CONTROL(GPIO_A_BASE,GPIO_PIN_MASK(7));
@@ -140,7 +140,7 @@ GPIOS_init(void)
 	gpio_register_callback(msg_callback, 0, 7);
 }
 /*---------------------------------------------------------------------------*/
-uint8_t
+uint16_t
 read_GPIOS(void)
 {
 	//reading the value in each pin
@@ -174,44 +174,44 @@ send_packet(void *ptr)
 	msg.timestamp_app = RTIMER_NOW();
 	msg.timestamp_mac = 0;
 
-	PRINTF("DATA send to %d\n",
+	PRINTF("DATA sent to %d\n",
 			server_ipaddr.u8[sizeof(server_ipaddr.u8) - 1]);
 	uip_udp_packet_sendto(client_conn, &msg, sizeof(msg),
 							&server_ipaddr, UIP_HTONS(UDP_SERVER_PORT));
 
-  ADCResult=0;
-  counter=0;
+    ADCResult=0;
+    counter=0;
 }
 /*---------------------------------------------------------------------------*/
 static void
 print_local_addresses(void)
 {
-  int i;
-  uint8_t state;
+    int i;
+    uint8_t state;
 
-  PRINTF("Client IPv6 addresses: ");
-  for(i = 0; i < UIP_DS6_ADDR_NB; i++) {
-    state = uip_ds6_if.addr_list[i].state;
-    if(uip_ds6_if.addr_list[i].isused &&
-       (state == ADDR_TENTATIVE || state == ADDR_PREFERRED)) {
-      PRINT6ADDR(&uip_ds6_if.addr_list[i].ipaddr);
-      PRINTF("\n");
-      /* hack to make address "final" */
-      if (state == ADDR_TENTATIVE) {
-	uip_ds6_if.addr_list[i].state = ADDR_PREFERRED;
-      }
+    PRINTF("Client IPv6 addresses: ");
+    for(i = 0; i < UIP_DS6_ADDR_NB; i++) {
+        state = uip_ds6_if.addr_list[i].state;
+        if(uip_ds6_if.addr_list[i].isused &&
+        (state == ADDR_TENTATIVE || state == ADDR_PREFERRED)) {
+        PRINT6ADDR(&uip_ds6_if.addr_list[i].ipaddr);
+        PRINTF("\n");
+        /* hack to make address "final" */
+        if (state == ADDR_TENTATIVE) {
+        uip_ds6_if.addr_list[i].state = ADDR_PREFERRED;
+        }
+        }
     }
-  }
 }
 /*---------------------------------------------------------------------------*/
 static void
 set_global_address(void)
 {
-  uip_ipaddr_t ipaddr;
+    uip_ipaddr_t ipaddr;
 
-  uip_ip6addr(&ipaddr, UIP_DS6_DEFAULT_PREFIX, 0, 0, 0, 0, 0, 0, 101);
-  uip_ds6_set_addr_iid(&ipaddr, &uip_lladdr);
-  uip_ds6_addr_add(&ipaddr, 0, ADDR_AUTOCONF);
+    uip_ip6addr(&ipaddr, UIP_DS6_DEFAULT_PREFIX, 0, 0, 0, 0, 0x00ff, 0xfe00, 102);
+    uip_ds6_set_addr_iid(&ipaddr, &uip_lladdr);
+    uip_ds6_addr_add(&ipaddr, 0, ADDR_MANUAL);
 
 /* The choice of server address determines its 6LoWPAN header compression.
  * (Our address will be compressed Mode 3 since it is derived from our
@@ -234,7 +234,7 @@ set_global_address(void)
    uip_ip6addr(&server_ipaddr, UIP_DS6_DEFAULT_PREFIX, 0, 0, 0, 0, 0, 0, 1);
 #elif 1
 /* Mode 2 - 16 bits inline */
-  uip_ip6addr(&server_ipaddr, UIP_DS6_DEFAULT_PREFIX, 0, 0, 0, 0, 0x00ff, 0xfe00, 0);
+    uip_ip6addr(&server_ipaddr, UIP_DS6_DEFAULT_PREFIX, 0, 0, 0, 0, 0x00ff, 0xfe00, 0);
 #else
 /* Mode 3 - derived from server link-local (MAC) address */
   uip_ip6addr(&server_ipaddr, UIP_DS6_DEFAULT_PREFIX, 0, 0, 0, 0x0250, 0xc2ff, 0xfea8, 0xcd1a); //redbee-econotag
@@ -243,56 +243,56 @@ set_global_address(void)
 /*---------------------------------------------------------------------------*/
 PROCESS_THREAD(observer_sender_process, ev, data)
 {
-  static struct etimer periodic;
-  PROCESS_BEGIN();
+    static struct etimer periodic;
+    PROCESS_BEGIN();
 
-  PROCESS_PAUSE();
+    PROCESS_PAUSE();
 
-  set_global_address();
+    set_global_address();
 
-  PRINTF("UDP client process started nbr:%d routes:%d\n",
+    PRINTF("UDP client process started nbr:%d routes:%d\n",
          NBR_TABLE_CONF_MAX_NEIGHBORS, UIP_CONF_MAX_ROUTES);
 
-  print_local_addresses();
+    print_local_addresses();
 
-  /* new connection with remote host */
-  client_conn = udp_new(NULL, UIP_HTONS(UDP_SERVER_PORT), NULL); 
-  if(client_conn == NULL) {
-    PRINTF("No UDP connection available, exiting the process!\n");
-    PROCESS_EXIT();
-  }
-  udp_bind(client_conn, UIP_HTONS(UDP_CLIENT_PORT)); 
+    /* new connection with remote host */
+    client_conn = udp_new(NULL, UIP_HTONS(UDP_SERVER_PORT), NULL); 
+    if(client_conn == NULL) {
+        PRINTF("No UDP connection available, exiting the process!\n");
+        PROCESS_EXIT();
+    }
+    udp_bind(client_conn, UIP_HTONS(UDP_CLIENT_PORT)); 
 
-  PRINTF("Created a connection with the server ");
-  PRINT6ADDR(&client_conn->ripaddr);
-  PRINTF(" local/remote port %u/%u\n",
+    PRINTF("Created a connection with the server ");
+    PRINT6ADDR(&client_conn->ripaddr);
+    PRINTF(" local/remote port %u/%u\n",
 	UIP_HTONS(client_conn->lport), UIP_HTONS(client_conn->rport));
 
-	flag=(GPIO_READ_PIN(GPIO_A_BASE,GPIO_PIN_MASK(7)));
+	//flag=(GPIO_READ_PIN(GPIO_A_BASE,GPIO_PIN_MASK(7)));
 
 	// adjust power
 	//cc2420_set_txpower(power);
 	NETSTACK_RADIO.set_value(RADIO_PARAM_TXPOWER, power);
 
-  // init ADC on A5, at 64 bit rate
-  adc_init();
-  adc_zoul.configure(SENSORS_HW_INIT,ZOUL_SENSORS_ADC2);
-  adc_zoul.configure(ZOUL_SENSORS_CONFIGURE_TYPE_DECIMATION_RATE, SOC_ADC_ADCCON_DIV_64);
+    // init ADC on A5, at 64 bit rate
+    adc_init();
+    adc_zoul.configure(SENSORS_HW_INIT,ZOUL_SENSORS_ADC2);
+    adc_zoul.configure(ZOUL_SENSORS_CONFIGURE_TYPE_DECIMATION_RATE, SOC_ADC_ADCCON_DIV_64);
 
 	GPIOS_init();
-  counter = 0;
+    counter = 0;
 
-  etimer_set(&periodic, ADC_READ_INTERVAL);
-  while(1) {
-    PROCESS_WAIT_UNTIL(etimer_expired(&periodic));
+    etimer_set(&periodic, ADC_READ_INTERVAL);
+    while(1) {
+        PROCESS_WAIT_UNTIL(etimer_expired(&periodic));
 
 		counter++;
 		int ADC_val = adc_zoul.value(ZOUL_SENSORS_ADC2);
 		ADCResult += ADC_val;
-    //printf("%d\n",ADC_val);
-    etimer_reset(&periodic);
-  }
+        //printf("%d\n",ADC_val);
+        etimer_reset(&periodic);
+    }
 
-  PROCESS_END();
+    PROCESS_END();
 }
 /*---------------------------------------------------------------------------*/
