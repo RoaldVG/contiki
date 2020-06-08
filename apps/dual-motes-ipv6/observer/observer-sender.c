@@ -36,7 +36,7 @@
  *         Marie-Paule Uwase
  *         August 7, 2012
  *         Roald Van Glabbeek
- * 		     March 3, 2020
+ *              March 3, 2020
  * 
  *         Updated for newer contiki release en Zolertia Zoul (firefly) and IPv6
  */
@@ -61,8 +61,6 @@
 #define UDP_CLIENT_PORT 8765
 #define UDP_SERVER_PORT 5678
 
-#define UDP_EXAMPLE_ID  190
-
 #define DEBUG DEBUG_FULL
 #include "net/ip/uip-debug.h"
 
@@ -84,12 +82,12 @@ uint32_t  counter=0;
 //uint8_t   flag;
 
 struct whitemsg {
-	uint16_t  blackseqno;
-	uint16_t whiteseqno;
-	uint32_t energy;
-	uint16_t counter_ADC;
-	uint16_t timestamp_app;
-	uint16_t timestamp_mac;
+    uint16_t  blackseqno;
+    uint16_t whiteseqno;
+    uint32_t energy;
+    uint16_t counter_ADC;
+    uint16_t timestamp_app;
+    uint16_t timestamp_mac;
 };
 
 /* sender power
@@ -116,68 +114,68 @@ void msg_callback(uint8_t port, uint8_t pin){
 void
 GPIOS_init(void)
 {
-	GPIO_SET_INPUT(GPIO_A_BASE,GPIO_PIN_MASK(6));		//GPIO PA6
+    GPIO_SET_INPUT(GPIO_A_BASE,GPIO_PIN_MASK(6));        //GPIO PA6
   
-    GPIO_SET_INPUT(GPIO_C_BASE,GPIO_PIN_MASK(0));		//GPIO PC0
-	GPIO_SET_INPUT(GPIO_C_BASE,GPIO_PIN_MASK(1));		//GPIO PC1
-    GPIO_SET_INPUT(GPIO_C_BASE,GPIO_PIN_MASK(2));		//GPIO PC2
-    GPIO_SET_INPUT(GPIO_C_BASE,GPIO_PIN_MASK(3));		//GPIO PC3
-	GPIO_SET_INPUT(GPIO_C_BASE,GPIO_PIN_MASK(4));		//GPIO PC4
-	GPIO_SET_INPUT(GPIO_C_BASE,GPIO_PIN_MASK(5));		//GPIO PC5
-    GPIO_SET_INPUT(GPIO_C_BASE,GPIO_PIN_MASK(6));		//GPIO PC6
+    GPIO_SET_INPUT(GPIO_C_BASE,GPIO_PIN_MASK(0));        //GPIO PC0
+    GPIO_SET_INPUT(GPIO_C_BASE,GPIO_PIN_MASK(1));        //GPIO PC1
+    GPIO_SET_INPUT(GPIO_C_BASE,GPIO_PIN_MASK(2));        //GPIO PC2
+    GPIO_SET_INPUT(GPIO_C_BASE,GPIO_PIN_MASK(3));        //GPIO PC3
+    GPIO_SET_INPUT(GPIO_C_BASE,GPIO_PIN_MASK(4));        //GPIO PC4
+    GPIO_SET_INPUT(GPIO_C_BASE,GPIO_PIN_MASK(5));        //GPIO PC5
+    GPIO_SET_INPUT(GPIO_C_BASE,GPIO_PIN_MASK(6));        //GPIO PC6
 
-	GPIO_SET_INPUT(GPIO_D_BASE,GPIO_PIN_MASK(0));		//GPIO PD0
-    GPIO_SET_INPUT(GPIO_D_BASE,GPIO_PIN_MASK(1));		//GPIO PD1
-	GPIO_SET_INPUT(GPIO_D_BASE,GPIO_PIN_MASK(2));		//GPIO PD2
+    GPIO_SET_INPUT(GPIO_D_BASE,GPIO_PIN_MASK(0));        //GPIO PD0
+    GPIO_SET_INPUT(GPIO_D_BASE,GPIO_PIN_MASK(1));        //GPIO PD1
+    GPIO_SET_INPUT(GPIO_D_BASE,GPIO_PIN_MASK(2));        //GPIO PD2
 
-	GPIO_SOFTWARE_CONTROL(GPIO_A_BASE,GPIO_PIN_MASK(7));
-	GPIO_SET_INPUT(GPIO_A_BASE,GPIO_PIN_MASK(7));
-	GPIO_DETECT_EDGE(GPIO_A_BASE,GPIO_PIN_MASK(7));
-	//GPIO_TRIGGER_SINGLE_EDGE(GPIO_A_BASE,GPIO_PIN_MASK(7));
-	GPIO_TRIGGER_BOTH_EDGES(GPIO_A_BASE,GPIO_PIN_MASK(7));
-	//GPIO_DETECT_RISING(GPIO_A_BASE,GPIO_PIN_MASK(7));
-	GPIO_ENABLE_INTERRUPT(GPIO_A_BASE,GPIO_PIN_MASK(7));
-	gpio_register_callback(msg_callback, 0, 7);
+    GPIO_SOFTWARE_CONTROL(GPIO_A_BASE,GPIO_PIN_MASK(7));
+    GPIO_SET_INPUT(GPIO_A_BASE,GPIO_PIN_MASK(7));
+    GPIO_DETECT_EDGE(GPIO_A_BASE,GPIO_PIN_MASK(7));
+    //GPIO_TRIGGER_SINGLE_EDGE(GPIO_A_BASE,GPIO_PIN_MASK(7));
+    GPIO_TRIGGER_BOTH_EDGES(GPIO_A_BASE,GPIO_PIN_MASK(7));
+    //GPIO_DETECT_RISING(GPIO_A_BASE,GPIO_PIN_MASK(7));
+    GPIO_ENABLE_INTERRUPT(GPIO_A_BASE,GPIO_PIN_MASK(7));
+    gpio_register_callback(msg_callback, 0, 7);
 }
 /*---------------------------------------------------------------------------*/
 uint16_t
 read_GPIOS(void)
 {
-	//reading the value in each pin
-	uint16_t  blackseqno=0;
+    //reading the value in each pin
+    uint16_t  blackseqno=0;
 
-	if (GPIO_READ_PIN(GPIO_A_BASE,GPIO_PIN_MASK(6)))	blackseqno=blackseqno+1;		
-	if (GPIO_READ_PIN(GPIO_C_BASE,GPIO_PIN_MASK(0)))    blackseqno=blackseqno+2;
-	if (GPIO_READ_PIN(GPIO_C_BASE,GPIO_PIN_MASK(1)))	blackseqno=blackseqno+4; 
-	if (GPIO_READ_PIN(GPIO_C_BASE,GPIO_PIN_MASK(2)))	blackseqno=blackseqno+8;
-	if (GPIO_READ_PIN(GPIO_C_BASE,GPIO_PIN_MASK(3)))	blackseqno=blackseqno+16; 
-	if (GPIO_READ_PIN(GPIO_C_BASE,GPIO_PIN_MASK(4)))	blackseqno=blackseqno+32; 
-	if (GPIO_READ_PIN(GPIO_C_BASE,GPIO_PIN_MASK(5)))    blackseqno=blackseqno+64;
-	if (GPIO_READ_PIN(GPIO_C_BASE,GPIO_PIN_MASK(6)))	blackseqno=blackseqno+128; 
-	if (GPIO_READ_PIN(GPIO_D_BASE,GPIO_PIN_MASK(0)))	blackseqno=blackseqno+256;
-	if (GPIO_READ_PIN(GPIO_D_BASE,GPIO_PIN_MASK(1)))	blackseqno=blackseqno+512; 
-	if (GPIO_READ_PIN(GPIO_D_BASE,GPIO_PIN_MASK(2)))	blackseqno=blackseqno+1024; 
+    if (GPIO_READ_PIN(GPIO_A_BASE,GPIO_PIN_MASK(6)))    blackseqno=blackseqno+1;        
+    if (GPIO_READ_PIN(GPIO_C_BASE,GPIO_PIN_MASK(0)))    blackseqno=blackseqno+2;
+    if (GPIO_READ_PIN(GPIO_C_BASE,GPIO_PIN_MASK(1)))    blackseqno=blackseqno+4; 
+    if (GPIO_READ_PIN(GPIO_C_BASE,GPIO_PIN_MASK(2)))    blackseqno=blackseqno+8;
+    if (GPIO_READ_PIN(GPIO_C_BASE,GPIO_PIN_MASK(3)))    blackseqno=blackseqno+16; 
+    if (GPIO_READ_PIN(GPIO_C_BASE,GPIO_PIN_MASK(4)))    blackseqno=blackseqno+32; 
+    if (GPIO_READ_PIN(GPIO_C_BASE,GPIO_PIN_MASK(5)))    blackseqno=blackseqno+64;
+    if (GPIO_READ_PIN(GPIO_C_BASE,GPIO_PIN_MASK(6)))    blackseqno=blackseqno+128; 
+    if (GPIO_READ_PIN(GPIO_D_BASE,GPIO_PIN_MASK(0)))    blackseqno=blackseqno+256;
+    if (GPIO_READ_PIN(GPIO_D_BASE,GPIO_PIN_MASK(1)))    blackseqno=blackseqno+512; 
+    if (GPIO_READ_PIN(GPIO_D_BASE,GPIO_PIN_MASK(2)))    blackseqno=blackseqno+1024; 
 
-	return blackseqno;
+    return blackseqno;
 }
 /*---------------------------------------------------------------------------*/
 static void
 send_packet(void *ptr)
 {
-	whiteseqno++;
-	struct whitemsg msg;
+    whiteseqno++;
+    struct whitemsg msg;
 
-	msg.blackseqno = read_GPIOS();	
-	msg.whiteseqno = whiteseqno;	
-	msg.energy = ADCResult;
-	msg.counter_ADC = counter;
-	msg.timestamp_app = RTIMER_NOW();
-	msg.timestamp_mac = 0;
+    msg.blackseqno = read_GPIOS();    
+    msg.whiteseqno = whiteseqno;    
+    msg.energy = ADCResult;
+    msg.counter_ADC = counter;
+    msg.timestamp_app = RTIMER_NOW();
+    msg.timestamp_mac = 0;
 
-	PRINTF("DATA sent to %d\n",
-			server_ipaddr.u8[sizeof(server_ipaddr.u8) - 1]);
-	uip_udp_packet_sendto(client_conn, &msg, sizeof(msg),
-							&server_ipaddr, UIP_HTONS(UDP_SERVER_PORT));
+    PRINTF("DATA sent to %d\n",
+            server_ipaddr.u8[sizeof(server_ipaddr.u8) - 1]);
+    uip_udp_packet_sendto(client_conn, &msg, sizeof(msg),
+                            &server_ipaddr, UIP_HTONS(UDP_SERVER_PORT));
 
     ADCResult=0;
     counter=0;
@@ -256,7 +254,7 @@ PROCESS_THREAD(observer_sender_process, ev, data)
     print_local_addresses();
 
     /* new connection with remote host */
-    client_conn = udp_new(NULL, UIP_HTONS(UDP_SERVER_PORT), NULL); 
+    client_conn = udp_new(NULL, 0, NULL); 
     if(client_conn == NULL) {
         PRINTF("No UDP connection available, exiting the process!\n");
         PROCESS_EXIT();
@@ -266,29 +264,28 @@ PROCESS_THREAD(observer_sender_process, ev, data)
     PRINTF("Created a connection with the server ");
     PRINT6ADDR(&client_conn->ripaddr);
     PRINTF(" local/remote port %u/%u\n",
-	UIP_HTONS(client_conn->lport), UIP_HTONS(client_conn->rport));
+    UIP_HTONS(client_conn->lport), UIP_HTONS(client_conn->rport));
 
-	//flag=(GPIO_READ_PIN(GPIO_A_BASE,GPIO_PIN_MASK(7)));
+    //flag=(GPIO_READ_PIN(GPIO_A_BASE,GPIO_PIN_MASK(7)));
 
-	// adjust power
-	//cc2420_set_txpower(power);
-	NETSTACK_RADIO.set_value(RADIO_PARAM_TXPOWER, power);
+    // adjust power
+    //cc2420_set_txpower(power);
+    NETSTACK_RADIO.set_value(RADIO_PARAM_TXPOWER, power);
 
     // init ADC on A5, at 64 bit rate
-    adc_init();
     adc_zoul.configure(SENSORS_HW_INIT,ZOUL_SENSORS_ADC2);
     adc_zoul.configure(ZOUL_SENSORS_CONFIGURE_TYPE_DECIMATION_RATE, SOC_ADC_ADCCON_DIV_64);
 
-	GPIOS_init();
+    GPIOS_init();
     counter = 0;
 
     etimer_set(&periodic, ADC_READ_INTERVAL);
     while(1) {
         PROCESS_WAIT_UNTIL(etimer_expired(&periodic));
 
-		counter++;
-		int ADC_val = adc_zoul.value(ZOUL_SENSORS_ADC2);
-		ADCResult += ADC_val;
+        counter++;
+        int ADC_val = adc_zoul.value(ZOUL_SENSORS_ADC2);
+        ADCResult += ADC_val;
         //printf("%d\n",ADC_val);
         etimer_reset(&periodic);
     }

@@ -24,7 +24,7 @@
  *         Marie-Paule Uwase
  *         August 13, 2012
  *         Roald Van Glabbeek
- * 		     March 3, 2020
+ *              March 3, 2020
  * 
  *         Updated for newer contiki release en Zolertia Zoul (firefly) and IPv6
  */
@@ -50,16 +50,14 @@
 
 #define UIP_IP_BUF   ((struct uip_ip_hdr *)&uip_buf[UIP_LLH_LEN])
 
-#define UDP_LOCAL_PORT	4567
-//#define UDP_REMOTE_PORT	5678
+#define UDP_LOCAL_PORT    4567
 
 #define UDP_EXAMPLE_ID  190
 
 static struct uip_udp_conn *server_conn;
-//static struct simple_udp_connection conn;
 
-PROCESS(white_sink_process, "White sink process");
-AUTOSTART_PROCESSES(&white_sink_process);
+PROCESS(energest_sink_process, "White sink process");
+AUTOSTART_PROCESSES(&energest_sink_process);
 
 // sender power
 // possible values =  0dBm = 31;  -1dBm = 27;  -3dBm = 23;  -5dBm = 19; 
@@ -69,18 +67,14 @@ uint8_t power = 31;
 // message counters
 static uint16_t received = 0 ;
 
-//variables for channel quality
-//int8_t lqi_val ;
-//int16_t rssi_val ;
-
 // Writes a title on the console
 struct energestmsg {
-	uint32_t 	cpu;
-	uint32_t 	lpm;
-	uint32_t 	transmit;
-	uint32_t 	listen;
-	uint16_t 	seqno;
-	uint32_t	totaltime;
+    uint32_t    cpu;
+    uint32_t    lpm;
+    uint32_t    transmit;
+    uint32_t    listen;
+    uint16_t    seqno;
+    uint32_t    totaltime;
 };
 
 // This is the receiver function
@@ -88,15 +82,15 @@ struct energestmsg {
 static void
 tcpip_handler()
 {
-    rtimer_clock_t rtime = RTIMER_NOW();		//received time (for the latency)
-	struct energestmsg *msg;
-	//memcpy(&msg, packetbuf_dataptr(), sizeof(msg));
+    rtimer_clock_t rtime = RTIMER_NOW();        //received time (for the latency)
+    struct energestmsg *msg;
+    //memcpy(&msg, packetbuf_dataptr(), sizeof(msg));
     msg = (struct energestmsg *)uip_appdata;
-	received ++;
-	uint16_t timestamp = packetbuf_attr(PACKETBUF_ATTR_TIMESTAMP);        
+    received ++;
+    uint16_t timestamp = packetbuf_attr(PACKETBUF_ATTR_TIMESTAMP);        
 
-	printf("%x,%" PRIu16 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32"\n\r",
-		    UIP_IP_BUF->srcipaddr.u8[sizeof(UIP_IP_BUF->srcipaddr.u8) - 1], msg->seqno, 
+    printf("%x,%" PRIu16 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32"\n\r",
+            UIP_IP_BUF->srcipaddr.u8[sizeof(UIP_IP_BUF->srcipaddr.u8) - 1], msg->seqno, 
             msg->cpu, msg->lpm, msg->transmit, msg->listen, msg->totaltime);
 }
 static void
@@ -119,10 +113,9 @@ print_local_addresses(void)
     }
 }
 /*---------------------------------------------------------------------------*/
-PROCESS_THREAD(white_sink_process, ev, data)
+PROCESS_THREAD(energest_sink_process, ev, data)
 {
     uip_ipaddr_t ipaddr;
-    struct uip_ds6_addr *root_if;
 
     PROCESS_BEGIN();
 
@@ -130,7 +123,8 @@ PROCESS_THREAD(white_sink_process, ev, data)
 
     PRINTF("UDP server started. nbr:%d routes:%d\n",
             NBR_TABLE_CONF_MAX_NEIGHBORS, UIP_CONF_MAX_ROUTES);
-
+    uip_ip6addr(&ipaddr, UIP_DS6_DEFAULT_PREFIX, 0, 0, 0, 0, 0x00ff, 0xfe00, 1);
+    uip_ds6_addr_add(&ipaddr, 0, ADDR_MANUAL);
 #if UIP_CONF_ROUTER
 /* The choice of server address determines its 6LoWPAN header compression.
  * Obviously the choice made here must also be selected in udp-client.c.
@@ -156,26 +150,14 @@ PROCESS_THREAD(white_sink_process, ev, data)
   uip_ip6addr(&ipaddr, UIP_DS6_DEFAULT_PREFIX, 0, 0, 0, 0, 0, 0, 0);
   uip_ds6_set_addr_iid(&ipaddr, &uip_lladdr);
 #endif
-
     uip_ds6_addr_add(&ipaddr, 0, ADDR_MANUAL);
-    /*root_if = uip_ds6_addr_lookup(&ipaddr);
-    if(root_if != NULL) {
-        rpl_dag_t *dag;
-        dag = rpl_set_root(RPL_DEFAULT_INSTANCE,(uip_ip6addr_t *)&ipaddr);
-        uip_ip6addr(&ipaddr, UIP_DS6_DEFAULT_PREFIX, 0, 0, 0, 0, 0, 0, 0);
-        rpl_set_prefix(dag, &ipaddr, 64);
-        PRINTF("created a new RPL dag\n");
-    } else {
-        PRINTF("failed to create a new RPL DAG\n");
-    }
-    */
 #endif /* UIP_CONF_ROUTER */
   
     print_local_addresses();
 
     /* The data sink runs with a 100% duty cycle in order to ensure high 
         packet reception rates. */
-    //NETSTACK_MAC.off(1);
+    NETSTACK_MAC.off(1);
     
     server_conn = udp_new(NULL, 0, NULL);
     if(server_conn == NULL) {
@@ -189,7 +171,6 @@ PROCESS_THREAD(white_sink_process, ev, data)
     PRINTF(" local/remote port %u/%u\n", UIP_HTONS(server_conn->lport),
             UIP_HTONS(server_conn->rport));
     
-    //simple_udp_register(&conn, UDP_LOCAL_PORT, NULL, UDP_LOCAL_PORT, tcpip_handler);
     while(1) {
         PROCESS_YIELD();
         if(ev == tcpip_event) {

@@ -4,7 +4,9 @@
 #define NETSTACK_CONF_RDC contikimac_driver
 #define NETSTACK_CONF_RDC_CHANNEL_CHECK_RATE 4
 #define UART_CONF_ENABLE 1
+#define NETSTACK_CONF_MAC csma_driver
+#define ENERGEST_CONF_ON 1
+#define UIP_CONF_ROUTER 0
 
-//#undef UIP_CONF_IPV6_RPL
-#define CONTIKI_WITH_RPL 0
+//#define TCPIP_CONF_ANNOTATE_TRANSMISSIONS 1
 #endif /* PROJECT_CONF_H_ */

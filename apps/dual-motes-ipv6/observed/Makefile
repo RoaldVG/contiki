@@ -11,8 +11,6 @@ $(error Software is platform specific, only for Zolertia Zoul.)
 endif
 
 all: observed-receiver observed-sender energest-sink
-
-CFLAGS += -DNETSTACK_CONF_RDC=contikimac_driver -DNETSTACK_CONF_RDC_CHANNEL_CHECK_RATE=4 -DUART_CONF_ENABLE=1 -DCONTIKI_WITH_RPL=0
-CONTIKI_WITH_RPL=0
-CONTIKI_WITH_IPV6 = 1
+CONTIKI_WITH_RPL = 0
+#CONTIKI_WITH_IPV6 = 1
 include $(CONTIKI)/Makefile.include
