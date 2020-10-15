@@ -52,6 +52,8 @@
 #include <string.h>
 
 #include "dev/gpio.h"
+#include "sys/energest.h"
+#include "project-conf.h"
 
 #define DEBUG DEBUG_FULL
 #include "net/ip/uip-debug.h"
@@ -64,7 +66,7 @@
 static uip_ipaddr_t energest_ipaddr;
 
 // Bit-width of IO communication with observer
-#define IO_WIDTH 11
+//#define IO_WIDTH 11
 
 /* Data structure of messages sent from sender
  *
@@ -91,7 +93,7 @@ static struct uip_udp_conn *server_conn;
 static struct uip_udp_conn *energest_conn;
 static uip_ipaddr_t energest_ipaddr;
 
-int received = 0;
+int seqno = 0;
 
 /*---------------------------------------------------------------------------*/
 PROCESS(observed_receiver_process, "observed receiver process");
@@ -150,8 +152,8 @@ send_energest()
     energest_values.lpm = energest_type_time(ENERGEST_TYPE_LPM) - prev_energest_vals.lpm;
     energest_values.transmit = energest_type_time(ENERGEST_TYPE_TRANSMIT) - prev_energest_vals.transmit;
     energest_values.listen = energest_type_time(ENERGEST_TYPE_LISTEN) - prev_energest_vals.listen;
-    energest_values.seqno = received;
-    
+    energest_values.seqno = seqno;
+
     uip_udp_packet_sendto(energest_conn, &energest_values, sizeof(energest_values),
                         &energest_ipaddr, UIP_HTONS(UDP_ENERGEST_PORT));
 
@@ -167,37 +169,37 @@ static void
 tcpip_handler()
 {
     struct testmsg msg;
-    received++;
     if(uip_newdata()) {
+        seqno = seqno < 2<<IO_WIDTH ? seqno+1 : 0;
         memcpy(&msg, uip_appdata, sizeof(msg));
         PRINTF("DATA recv from %d\n", UIP_IP_BUF->srcipaddr.u8[sizeof(UIP_IP_BUF->srcipaddr.u8) - 1]);
+
+        static uint8_t seqno_bits[IO_WIDTH];            
+        uint8_t i;
+        for (i = 0; i < IO_WIDTH; i++) {
+            seqno_bits[i] = seqno & (1 << i) ? 1 : 0;
+        }        //least significant bit in seqno_bits[0]
+
+        clear_GPIOS();
+        
+        if ( seqno_bits[0]==1 )        GPIO_SET_PIN(GPIO_A_BASE,GPIO_PIN_MASK(6));       //  write a 1 in A6
+        if ( seqno_bits[1]==1 )        GPIO_SET_PIN(GPIO_C_BASE,GPIO_PIN_MASK(0));       //  write a 1 in C0
+        if ( seqno_bits[2]==1 )        GPIO_SET_PIN(GPIO_C_BASE,GPIO_PIN_MASK(1));       //  write a 1 in C1
+        if ( seqno_bits[3]==1 )        GPIO_SET_PIN(GPIO_C_BASE,GPIO_PIN_MASK(2));       //  write a 1 in C2
+        if ( seqno_bits[4]==1 )        GPIO_SET_PIN(GPIO_C_BASE,GPIO_PIN_MASK(3));       //  write a 1 in C3
+        if ( seqno_bits[5]==1 )        GPIO_SET_PIN(GPIO_C_BASE,GPIO_PIN_MASK(4));       //  write a 1 in C4
+        if ( seqno_bits[6]==1 )        GPIO_SET_PIN(GPIO_C_BASE,GPIO_PIN_MASK(5));       //  write a 1 in C5
+        if ( seqno_bits[7]==1 )        GPIO_SET_PIN(GPIO_C_BASE,GPIO_PIN_MASK(6));       //  write a 1 in C6
+        if ( seqno_bits[8]==1 )        GPIO_SET_PIN(GPIO_D_BASE,GPIO_PIN_MASK(0));       //  write a 1 in D0
+        if ( seqno_bits[9]==1 )        GPIO_SET_PIN(GPIO_D_BASE,GPIO_PIN_MASK(1));       //  write a 1 in D1
+        if ( seqno_bits[10]==1 )       GPIO_SET_PIN(GPIO_D_BASE,GPIO_PIN_MASK(2));       //  write a 1 in D2
+        
+        if (GPIO_READ_PIN(GPIO_PORT_TO_BASE(0),GPIO_PIN_MASK(7)) == 0)
+            GPIO_SET_PIN(GPIO_PORT_TO_BASE(0),GPIO_PIN_MASK(7));
+        else
+            GPIO_CLR_PIN(GPIO_PORT_TO_BASE(0),GPIO_PIN_MASK(7));
+
     }
-
-    static uint8_t seqno_bits[IO_WIDTH];            
-    uint8_t i;
-    for (i = 0; i < IO_WIDTH; i++) {
-        seqno_bits[i] = msg.blackseqno & (1 << i) ? 1 : 0;
-    }        //least significant bit in seqno_bits[0]
-
-    clear_GPIOS();
-    
-    if ( seqno_bits[0]==1 )        GPIO_SET_PIN(GPIO_A_BASE,GPIO_PIN_MASK(6));       //  write a 1 in A6
-    if ( seqno_bits[1]==1 )        GPIO_SET_PIN(GPIO_C_BASE,GPIO_PIN_MASK(0));       //  write a 1 in C0
-    if ( seqno_bits[2]==1 )        GPIO_SET_PIN(GPIO_C_BASE,GPIO_PIN_MASK(1));       //  write a 1 in C1
-    if ( seqno_bits[3]==1 )        GPIO_SET_PIN(GPIO_C_BASE,GPIO_PIN_MASK(2));       //  write a 1 in C2
-    if ( seqno_bits[4]==1 )        GPIO_SET_PIN(GPIO_C_BASE,GPIO_PIN_MASK(3));       //  write a 1 in C3
-    if ( seqno_bits[5]==1 )        GPIO_SET_PIN(GPIO_C_BASE,GPIO_PIN_MASK(4));       //  write a 1 in C4
-    if ( seqno_bits[6]==1 )        GPIO_SET_PIN(GPIO_C_BASE,GPIO_PIN_MASK(5));       //  write a 1 in C5
-    if ( seqno_bits[7]==1 )        GPIO_SET_PIN(GPIO_C_BASE,GPIO_PIN_MASK(6));       //  write a 1 in C6
-    if ( seqno_bits[8]==1 )        GPIO_SET_PIN(GPIO_D_BASE,GPIO_PIN_MASK(0));       //  write a 1 in D0
-    if ( seqno_bits[9]==1 )        GPIO_SET_PIN(GPIO_D_BASE,GPIO_PIN_MASK(1));       //  write a 1 in D1
-    if ( seqno_bits[10]==1 )    GPIO_SET_PIN(GPIO_D_BASE,GPIO_PIN_MASK(2));       //  write a 1 in D2
-    
-    if (GPIO_READ_PIN(GPIO_PORT_TO_BASE(0),GPIO_PIN_MASK(7)) == 0)
-        GPIO_SET_PIN(GPIO_PORT_TO_BASE(0),GPIO_PIN_MASK(7));
-    else
-        GPIO_CLR_PIN(GPIO_PORT_TO_BASE(0),GPIO_PIN_MASK(7));
-
 }
 /*---------------------------------------------------------------------------*/
 static void
@@ -232,8 +234,8 @@ PROCESS_THREAD(observed_receiver_process, ev, data)
     PRINTF("UDP server started. nbr:%d routes:%d\n",
          NBR_TABLE_CONF_MAX_NEIGHBORS, UIP_CONF_MAX_ROUTES);
 
-    uip_ip6addr(&ipaddr, UIP_DS6_DEFAULT_PREFIX, 0, 0, 0, 0, 0x00ff, 0xfe00, 2);
-    uip_ip6addr(&energest_ipaddr, UIP_DS6_DEFAULT_PREFIX, 0, 0, 0, 0, 0x00ff, 0xfe00, 1);
+    uip_ip6addr(&ipaddr, UIP_DS6_DEFAULT_PREFIX, 0, 0, 0, 0, 0x00ff, 0xfe00, 10);
+    uip_ip6addr(&energest_ipaddr, UIP_DS6_DEFAULT_PREFIX, 0, 0, 0, 0, 0x00ff, 0xfe00, 3);
     uip_ds6_addr_add(&ipaddr, 0, ADDR_MANUAL);
 
 #if UIP_CONF_ROUTER
@@ -249,13 +251,12 @@ PROCESS_THREAD(observed_receiver_process, ev, data)
  * Note Wireshark's IPCMV6 checksum verification depends on the correct
  * uncompressed addresses.
  */
- 
 #if 0
 /* Mode 1 - 64 bits inline */
    uip_ip6addr(&ipaddr, UIP_DS6_DEFAULT_PREFIX, 0, 0, 0, 0, 0, 0, 1);
 #elif 1
 /* Mode 2 - 16 bits inline */
-    uip_ip6addr(&ipaddr, UIP_DS6_DEFAULT_PREFIX, 0, 0, 0, 0, 0, 0, 2);
+    uip_ip6addr(&ipaddr, UIP_DS6_DEFAULT_PREFIX, 0, 0, 0, 0, 0, 0, 10);
 #else
 /* Mode 3 - derived from link local (MAC) address */
   uip_ip6addr(&ipaddr, UIP_DS6_DEFAULT_PREFIX, 0, 0, 0, 0, 0, 0, 0);
@@ -276,6 +277,8 @@ PROCESS_THREAD(observed_receiver_process, ev, data)
         PRINTF("failed to create a new RPL DAG\n");
     }
 #endif /* UIP_CONF_IPV6_RPL */
+#else
+#error "Receiver must be router, set UIP_CONF_ROUTER to 1"
 #endif /* UIP_CONF_ROUTER */
   
     print_local_addresses();
@@ -312,14 +315,14 @@ PROCESS_THREAD(observed_receiver_process, ev, data)
     prev_energest_vals.listen = 0;
     prev_energest_vals.seqno = 0;
     prev_energest_vals.totaltime = 0;
-    printf("IPV6 %d, RPL %d, ND6 %d, ROUTER %d\n",NETSTACK_CONF_WITH_IPV6, UIP_CONF_IPV6_RPL, UIP_CONF_ND6_SEND_NS, UIP_CONF_ROUTER);
+    PRINTF("IPV6 %d, RPL %d, ND6 %d, ROUTER %d\n",NETSTACK_CONF_WITH_IPV6, UIP_CONF_IPV6_RPL, UIP_CONF_ND6_SEND_NS, UIP_CONF_ROUTER);
 
     while(1) {
         PROCESS_YIELD();
         
         if(ev == tcpip_event) {
             tcpip_handler();
-            if (received%7 == 0)
+            if (seqno%ENERGEST_FREQ == 0)
                 send_energest();
         }
         

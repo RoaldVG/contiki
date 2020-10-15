@@ -123,8 +123,11 @@ PROCESS_THREAD(energest_sink_process, ev, data)
 
     PRINTF("UDP server started. nbr:%d routes:%d\n",
             NBR_TABLE_CONF_MAX_NEIGHBORS, UIP_CONF_MAX_ROUTES);
-    uip_ip6addr(&ipaddr, UIP_DS6_DEFAULT_PREFIX, 0, 0, 0, 0, 0x00ff, 0xfe00, 1);
+    uip_ip6addr(&ipaddr, UIP_DS6_DEFAULT_PREFIX, 0, 0, 0, 0, 0x00ff, 0xfe00, 3);
     uip_ds6_addr_add(&ipaddr, 0, ADDR_MANUAL);
+#if !UART_CONF_ENABLE
+#error "No logging possible, set UART_CONF_ENABLE to 1"
+#endif /* UART_CONF_ENABLE */
 #if UIP_CONF_ROUTER
 /* The choice of server address determines its 6LoWPAN header compression.
  * Obviously the choice made here must also be selected in udp-client.c.
@@ -138,13 +141,13 @@ PROCESS_THREAD(energest_sink_process, ev, data)
  * Note Wireshark's IPCMV6 checksum verification depends on the correct
  * uncompressed addresses.
  */
- 
+#error "Sink cannot be router, set UIP_CONF_ROUTET to 0"
 #if 0
 /* Mode 1 - 64 bits inline */
    uip_ip6addr(&ipaddr, UIP_DS6_DEFAULT_PREFIX, 0, 0, 0, 0, 0, 0, 1);
 #elif 1
 /* Mode 2 - 16 bits inline */
-    uip_ip6addr(&ipaddr, UIP_DS6_DEFAULT_PREFIX, 0, 0, 0, 0, 0x00ff, 0xfe00, 1);
+    uip_ip6addr(&ipaddr, UIP_DS6_DEFAULT_PREFIX, 0, 0, 0, 0, 0x00ff, 0xfe00, 3);
 #else
 /* Mode 3 - derived from link local (MAC) address */
   uip_ip6addr(&ipaddr, UIP_DS6_DEFAULT_PREFIX, 0, 0, 0, 0, 0, 0, 0);

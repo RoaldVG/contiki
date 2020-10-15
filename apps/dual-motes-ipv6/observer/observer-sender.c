@@ -86,9 +86,11 @@ struct whitemsg {
     uint16_t whiteseqno;
     uint32_t energy;
     uint16_t counter_ADC;
-    uint16_t timestamp_app;
+    uint32_t timestamp_app;
     uint16_t timestamp_mac;
 };
+
+uint32_t prev_time;
 
 /* sender power
  * possible values =  0dBm = 31;  -1dBm = 27;  -3dBm = 23;  -5dBm = 19; 
@@ -169,7 +171,7 @@ send_packet(void *ptr)
     msg.whiteseqno = whiteseqno;    
     msg.energy = ADCResult;
     msg.counter_ADC = counter;
-    msg.timestamp_app = RTIMER_NOW();
+    msg.timestamp_app = RTIMER_NOW() - prev_time;
     msg.timestamp_mac = 0;
 
     PRINTF("DATA sent to %d\n",
@@ -179,6 +181,7 @@ send_packet(void *ptr)
 
     ADCResult=0;
     counter=0;
+    prev_time = msg.timestamp_app;
 }
 /*---------------------------------------------------------------------------*/
 static void
@@ -232,7 +235,7 @@ set_global_address(void)
    uip_ip6addr(&server_ipaddr, UIP_DS6_DEFAULT_PREFIX, 0, 0, 0, 0, 0, 0, 1);
 #elif 1
 /* Mode 2 - 16 bits inline */
-    uip_ip6addr(&server_ipaddr, UIP_DS6_DEFAULT_PREFIX, 0, 0, 0, 0, 0x00ff, 0xfe00, 0);
+    uip_ip6addr(&server_ipaddr, UIP_DS6_DEFAULT_PREFIX, 0, 0, 0, 0, 0x00ff, 0xfe00, 2);
 #else
 /* Mode 3 - derived from server link-local (MAC) address */
   uip_ip6addr(&server_ipaddr, UIP_DS6_DEFAULT_PREFIX, 0, 0, 0, 0x0250, 0xc2ff, 0xfea8, 0xcd1a); //redbee-econotag
@@ -273,18 +276,19 @@ PROCESS_THREAD(observer_sender_process, ev, data)
     NETSTACK_RADIO.set_value(RADIO_PARAM_TXPOWER, power);
 
     // init ADC on A5, at 64 bit rate
-    adc_zoul.configure(SENSORS_HW_INIT,ZOUL_SENSORS_ADC2);
+    adc_zoul.configure(SENSORS_HW_INIT,ZOUL_SENSORS_ADC1);
     adc_zoul.configure(ZOUL_SENSORS_CONFIGURE_TYPE_DECIMATION_RATE, SOC_ADC_ADCCON_DIV_64);
 
     GPIOS_init();
     counter = 0;
+    prev_time = 0;
 
     etimer_set(&periodic, ADC_READ_INTERVAL);
     while(1) {
         PROCESS_WAIT_UNTIL(etimer_expired(&periodic));
 
         counter++;
-        int ADC_val = adc_zoul.value(ZOUL_SENSORS_ADC2);
+        int ADC_val = adc_zoul.value(ZOUL_SENSORS_ADC1);
         ADCResult += ADC_val;
         //printf("%d\n",ADC_val);
         etimer_reset(&periodic);

@@ -53,22 +53,18 @@
 #include "cpu/cc2538/dev/gpio.h"
 
 #include "simple-udp.h"
-//#include "servreg-hack.h"
+#include "project-conf.h"
+#include "sys/energest.h"
+
+#define DEBUG DEBUG_FULL
+#include "net/ip/uip-debug.h"
 
 #define UDP_LOCAL_PORT 8765
 #define UDP_RCV_PORT 5678
 #define UDP_ENERGEST_PORT 4567
 
-#define SERVICE_ID 190
-
-#define DEBUG DEBUG_FULL
-#include "net/ip/uip-debug.h"
-#include "net/net-debug.h"
-
 // Bit-width of IO communication with observer
-#define IO_WIDTH 11
-
-#define START_DELAY 20
+//#define IO_WIDTH 11
 
 #define AVERAGE_SEND_INTERVAL CLOCK_SECOND
 #define RANDOM 0
@@ -229,7 +225,7 @@ send_packet()//void *ptr)
     if ( seqno_bits[7]==1 )        GPIO_SET_PIN(GPIO_C_BASE,GPIO_PIN_MASK(6));       //  write a 1 in C6
     if ( seqno_bits[8]==1 )        GPIO_SET_PIN(GPIO_D_BASE,GPIO_PIN_MASK(0));       //  write a 1 in D0
     if ( seqno_bits[9]==1 )        GPIO_SET_PIN(GPIO_D_BASE,GPIO_PIN_MASK(1));       //  write a 1 in D1
-    if ( seqno_bits[10]==1 )    GPIO_SET_PIN(GPIO_D_BASE,GPIO_PIN_MASK(2));       //  write a 1 in D2
+    if ( seqno_bits[10]==1 )       GPIO_SET_PIN(GPIO_D_BASE,GPIO_PIN_MASK(2));       //  write a 1 in D2
     
     if (GPIO_READ_PIN(GPIO_PORT_TO_BASE(0),GPIO_PIN_MASK(7)) == 0)
         GPIO_SET_PIN(GPIO_PORT_TO_BASE(0),GPIO_PIN_MASK(7));
@@ -242,7 +238,7 @@ send_packet()//void *ptr)
       uip_udp_packet_sendto(client_conn, &msg, sizeof(msg),
                         &server_ipaddr, UIP_HTONS(UDP_RCV_PORT));
 
-    if (seqno%5==0)
+    if (seqno%ENERGEST_FREQ==0)
         send_energest();
 }
 /*---------------------------------------------------------------------------*/
@@ -272,7 +268,7 @@ set_global_address(void)
 {
   uip_ipaddr_t ipaddr;
 
-  uip_ip6addr(&ipaddr, UIP_DS6_DEFAULT_PREFIX, 0, 0, 0, 0, 0x00ff, 0xfe00, 3);
+  uip_ip6addr(&ipaddr, UIP_DS6_DEFAULT_PREFIX, 0, 0, 0, 0, 0x00ff, 0xfe00, 11);
   //uip_ds6_set_addr_iid(&ipaddr, &uip_lladdr);
   uip_ds6_addr_add(&ipaddr, 0, ADDR_MANUAL);
 
@@ -291,14 +287,18 @@ set_global_address(void)
  * Note the IPCMV6 checksum verification depends on the correct uncompressed
  * addresses.
  */
+
+#if UIP_CONF_ROUTER
+#error "Sender cannot be router, set UIP_CONF_ROUTET to 0"
+#endif /*UIP_CONF_ROUTER*/
  
 #if 0
 /* Mode 1 - 64 bits inline */
    uip_ip6addr(&server_ipaddr, UIP_DS6_DEFAULT_PREFIX, 0, 0, 0, 0, 0, 0, 1);
 #elif 1
 /* Mode 2 - 16 bits inline */
-  uip_ip6addr(&server_ipaddr, UIP_DS6_DEFAULT_PREFIX, 0, 0, 0, 0, 0x00ff, 0xfe00, 2);
-  uip_ip6addr(&energest_ipaddr, UIP_DS6_DEFAULT_PREFIX, 0, 0, 0, 0, 0x00ff, 0xfe00, 1);
+  uip_ip6addr(&server_ipaddr, UIP_DS6_DEFAULT_PREFIX, 0, 0, 0, 0, 0x00ff, 0xfe00, 10);
+  uip_ip6addr(&energest_ipaddr, UIP_DS6_DEFAULT_PREFIX, 0, 0, 0, 0, 0x00ff, 0xfe00, 3);
 #else
 /* Mode 3 - derived from server link-local (MAC) address */
   uip_ip6addr(&server_ipaddr, UIP_DS6_DEFAULT_PREFIX, 0, 0, 0, 0x0250, 0xc2ff, 0xfea8, 0xcd1a); //redbee-econotag
@@ -357,7 +357,7 @@ PROCESS_THREAD(observed_sender_process, ev, data)
     prev_energest_vals.seqno = 0;
     prev_energest_vals.totaltime = 0;
 
-    printf("IPV6 %d, RPL %d, ND6 %d\n",NETSTACK_CONF_WITH_IPV6, UIP_CONF_IPV6_RPL, UIP_CONF_ND6_SEND_NS);
+    PRINTF("IPV6 %d, RPL %d, ND6 %d, ROUTER %d\n",NETSTACK_CONF_WITH_IPV6, UIP_CONF_IPV6_RPL, UIP_CONF_ND6_SEND_NS, UIP_CONF_ROUTER);
 
     etimer_set(&periodic, SEND_INTERVAL);
     while(1) {

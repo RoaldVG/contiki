@@ -75,7 +75,7 @@ struct whitemsg {
     uint16_t    whiteseqno;
     uint32_t    energy;
     uint16_t    counter_ADC;
-    uint16_t    timestamp_app;
+    uint32_t    timestamp_app;
     uint16_t    timestamp_mac;
 };
 
@@ -90,7 +90,7 @@ tcpip_handler(void)
         memcpy(&msg, uip_appdata, sizeof(msg));
         received ++;
         uint16_t timestamp = packetbuf_attr(PACKETBUF_ATTR_TIMESTAMP);
-        printf("%x%x,%" PRIu16 ",%" PRIu16 ",%" PRIu16 ",%" PRIu32 ",%" PRIu16 ",%" PRIu16 ",%" PRIu16 ",%" PRIu16 ",%lu\n\r",
+        printf("%x%x,%" PRIu16 ",%" PRIu16 ",%" PRIu16 ",%" PRIu32 ",%" PRIu16 ",%" PRIu32 ",%" PRIu16 ",%" PRIu16 ",%lu\n\r",
                 UIP_IP_BUF->srcipaddr.u8[sizeof(UIP_IP_BUF->srcipaddr.u8) - 2], UIP_IP_BUF->srcipaddr.u8[sizeof(UIP_IP_BUF->srcipaddr.u8) - 1], 
                 received,msg.blackseqno,msg.whiteseqno,
                 msg.energy,msg.counter_ADC, 
@@ -128,7 +128,9 @@ PROCESS_THREAD(observer_sink_process, ev, data)
 
     PRINTF("UDP server started. nbr:%d routes:%d\n",
             NBR_TABLE_CONF_MAX_NEIGHBORS, UIP_CONF_MAX_ROUTES);
-
+#if !UART_CONF_ENABLE
+#error "No logging possible, set UART_CONF_ENABLE to 1"
+#endif /* UART_CONF_ENABLE */
 #if UIP_CONF_ROUTER
 /* The choice of server address determines its 6LoWPAN header compression.
  * Obviously the choice made here must also be selected in udp-client.c.
@@ -148,7 +150,7 @@ PROCESS_THREAD(observer_sink_process, ev, data)
    uip_ip6addr(&ipaddr, UIP_DS6_DEFAULT_PREFIX, 0, 0, 0, 0, 0, 0, 1);
 #elif 1
 /* Mode 2 - 16 bits inline */
-    uip_ip6addr(&ipaddr, UIP_DS6_DEFAULT_PREFIX, 0, 0, 0, 0, 0x00ff, 0xfe00, 0);
+    uip_ip6addr(&ipaddr, UIP_DS6_DEFAULT_PREFIX, 0, 0, 0, 0, 0x00ff, 0xfe00, 2);
 #else
 /* Mode 3 - derived from link local (MAC) address */
   uip_ip6addr(&ipaddr, UIP_DS6_DEFAULT_PREFIX, 0, 0, 0, 0, 0, 0, 0);
