@@ -34,7 +34,7 @@
  *         Marie-Paule Uwase
  *         August 7, 2012
  *         Roald Van Glabbeek
- *            March 3, 2020
+ *         March 3, 2020
  * 
  *         Updated for newer contiki release en Zolertia Zoul (firefly) and IPv6
  */
@@ -63,9 +63,6 @@
 #define UDP_RCV_PORT 5678
 #define UDP_ENERGEST_PORT 4567
 
-// Bit-width of IO communication with observer
-//#define IO_WIDTH 11
-
 #define AVERAGE_SEND_INTERVAL CLOCK_SECOND
 #define RANDOM 0
 #define MIN_SEND_INTERVAL 1
@@ -81,9 +78,9 @@
  *
  */
 struct testmsg {       
-    uint16_t  blackseqno;
+    uint16_t  observed_seqno;
     uint16_t  timestamp_app;
-      char      padding[44];
+    char      padding[44];
     uint16_t  timestamp_mac;
 };
 
@@ -93,7 +90,7 @@ struct energestmsg {
     uint32_t     transmit;
     uint32_t     listen;
     uint16_t     seqno;
-    uint32_t    totaltime;
+    uint32_t     totaltime;
 };
 
 struct energestmsg prev_energest_vals;
@@ -101,7 +98,7 @@ struct energestmsg prev_energest_vals;
 uint16_t seqno=0;
 
 static struct uip_udp_conn *client_conn;
-static uip_ipaddr_t server_ipaddr;
+static uip_ipaddr_t server_ipaddr;  // receiver address
 static struct uip_udp_conn *energest_conn;
 static uip_ipaddr_t energest_ipaddr;
 
@@ -116,16 +113,16 @@ GPIOS_init(void)
     GPIO_SET_OUTPUT(GPIO_A_BASE,GPIO_PIN_MASK(6));        //GPIO PA6
     GPIO_SET_OUTPUT(GPIO_A_BASE,GPIO_PIN_MASK(7));        //GPIO PA7
   
-     GPIO_SET_OUTPUT(GPIO_C_BASE,GPIO_PIN_MASK(0));        //GPIO PC0
+    GPIO_SET_OUTPUT(GPIO_C_BASE,GPIO_PIN_MASK(0));        //GPIO PC0
     GPIO_SET_OUTPUT(GPIO_C_BASE,GPIO_PIN_MASK(1));        //GPIO PC1
-      GPIO_SET_OUTPUT(GPIO_C_BASE,GPIO_PIN_MASK(2));        //GPIO PC2
-      GPIO_SET_OUTPUT(GPIO_C_BASE,GPIO_PIN_MASK(3));        //GPIO PC3
+    GPIO_SET_OUTPUT(GPIO_C_BASE,GPIO_PIN_MASK(2));        //GPIO PC2
+    GPIO_SET_OUTPUT(GPIO_C_BASE,GPIO_PIN_MASK(3));        //GPIO PC3
     GPIO_SET_OUTPUT(GPIO_C_BASE,GPIO_PIN_MASK(4));        //GPIO PC4
     GPIO_SET_OUTPUT(GPIO_C_BASE,GPIO_PIN_MASK(5));        //GPIO PC5
-      GPIO_SET_OUTPUT(GPIO_C_BASE,GPIO_PIN_MASK(6));        //GPIO PC6
+    GPIO_SET_OUTPUT(GPIO_C_BASE,GPIO_PIN_MASK(6));        //GPIO PC6
 
     GPIO_SET_OUTPUT(GPIO_D_BASE,GPIO_PIN_MASK(0));        //GPIO PD0
-      GPIO_SET_OUTPUT(GPIO_D_BASE,GPIO_PIN_MASK(1));        //GPIO PD1
+    GPIO_SET_OUTPUT(GPIO_D_BASE,GPIO_PIN_MASK(1));        //GPIO PD1
     GPIO_SET_OUTPUT(GPIO_D_BASE,GPIO_PIN_MASK(2));        //GPIO PD2
     
 }
@@ -137,16 +134,16 @@ clear_GPIOS(void)
     
     GPIO_CLR_PIN(GPIO_A_BASE,GPIO_PIN_MASK(6));        //GPIO PA6
     
-     GPIO_CLR_PIN(GPIO_C_BASE,GPIO_PIN_MASK(0));        //GPIO PC0
+    GPIO_CLR_PIN(GPIO_C_BASE,GPIO_PIN_MASK(0));        //GPIO PC0
     GPIO_CLR_PIN(GPIO_C_BASE,GPIO_PIN_MASK(1));        //GPIO PC1
-      GPIO_CLR_PIN(GPIO_C_BASE,GPIO_PIN_MASK(2));        //GPIO PC2
-      GPIO_CLR_PIN(GPIO_C_BASE,GPIO_PIN_MASK(3));        //GPIO PC3
+    GPIO_CLR_PIN(GPIO_C_BASE,GPIO_PIN_MASK(2));        //GPIO PC2
+    GPIO_CLR_PIN(GPIO_C_BASE,GPIO_PIN_MASK(3));        //GPIO PC3
     GPIO_CLR_PIN(GPIO_C_BASE,GPIO_PIN_MASK(4));        //GPIO PC4
     GPIO_CLR_PIN(GPIO_C_BASE,GPIO_PIN_MASK(5));        //GPIO PC5
-      GPIO_CLR_PIN(GPIO_C_BASE,GPIO_PIN_MASK(6));        //GPIO PC6
+    GPIO_CLR_PIN(GPIO_C_BASE,GPIO_PIN_MASK(6));        //GPIO PC6
 
     GPIO_CLR_PIN(GPIO_D_BASE,GPIO_PIN_MASK(0));        //GPIO PD0
-      GPIO_CLR_PIN(GPIO_D_BASE,GPIO_PIN_MASK(1));        //GPIO PD1
+    GPIO_CLR_PIN(GPIO_D_BASE,GPIO_PIN_MASK(1));        //GPIO PD1
     GPIO_CLR_PIN(GPIO_D_BASE,GPIO_PIN_MASK(2));        //GPIO PD2
     
 }
@@ -154,14 +151,13 @@ clear_GPIOS(void)
 static void
 tcpip_handler()
 {
-  char *str;
+    char *str;
 
-  if(uip_newdata()) {
-    str = uip_appdata;
-    str[uip_datalen()] = '\0';
-    //reply++;
-    PRINTF("DATA recv");// '%s' (s:%d, r:%d)\n", str, seqno);//, reply);
-  }
+    if(uip_newdata()) {
+        str = uip_appdata;
+        str[uip_datalen()] = '\0';
+        PRINTF("DATA recv");// '%s' (s:%d, r:%d)\n", str, seqno);//, reply);
+    }
 }
 /*---------------------------------------------------------------------------*/
 static void
@@ -196,25 +192,21 @@ send_packet()//void *ptr)
 {
     struct testmsg msg;
 
-    seqno = seqno < 2<<IO_WIDTH ? seqno+1 : 0;
-    /*if (seqno < ((2<<(IO_WIDTH))-1))
-        seqno++;
-    else
-        seqno=0;
-    */
+    seqno = seqno < 1<<IO_WIDTH ? seqno+1 : 0;
 
     /*Set general info*/
-    msg.blackseqno=seqno;        
+    msg.observed_seqno=seqno;        
     msg.timestamp_app= clock_time();
 
     static uint8_t seqno_bits[IO_WIDTH];            
     uint8_t i;
     for (i = 0; i < IO_WIDTH; i++) {
-        seqno_bits[i] = msg.blackseqno & (1 << i) ? 1 : 0;
+        seqno_bits[i] = msg.observed_seqno & (1 << i) ? 1 : 0;
     }        //least significant bit in seqno_bits[0]
 
     clear_GPIOS();
     
+    // set data on data pins
     if ( seqno_bits[0]==1 )        GPIO_SET_PIN(GPIO_A_BASE,GPIO_PIN_MASK(6));       //  write a 1 in A6
     if ( seqno_bits[1]==1 )        GPIO_SET_PIN(GPIO_C_BASE,GPIO_PIN_MASK(0));       //  write a 1 in C0
     if ( seqno_bits[2]==1 )        GPIO_SET_PIN(GPIO_C_BASE,GPIO_PIN_MASK(1));       //  write a 1 in C1
@@ -227,15 +219,17 @@ send_packet()//void *ptr)
     if ( seqno_bits[9]==1 )        GPIO_SET_PIN(GPIO_D_BASE,GPIO_PIN_MASK(1));       //  write a 1 in D1
     if ( seqno_bits[10]==1 )       GPIO_SET_PIN(GPIO_D_BASE,GPIO_PIN_MASK(2));       //  write a 1 in D2
     
+    // change state of trigget pin
     if (GPIO_READ_PIN(GPIO_PORT_TO_BASE(0),GPIO_PIN_MASK(7)) == 0)
         GPIO_SET_PIN(GPIO_PORT_TO_BASE(0),GPIO_PIN_MASK(7));
     else
         GPIO_CLR_PIN(GPIO_PORT_TO_BASE(0),GPIO_PIN_MASK(7));
-    
+
       PRINTF("DATA sent to %d\n",
          server_ipaddr.u8[sizeof(server_ipaddr.u8) - 1]);
   
-      uip_udp_packet_sendto(client_conn, &msg, sizeof(msg),
+    // send packet to receiver
+    uip_udp_packet_sendto(client_conn, &msg, sizeof(msg),
                         &server_ipaddr, UIP_HTONS(UDP_RCV_PORT));
 
     if (seqno%ENERGEST_FREQ==0)
@@ -245,33 +239,33 @@ send_packet()//void *ptr)
 static void
 print_local_addresses(void)
 {
-  int i;
-  uint8_t state;
+    int i;
+    uint8_t state;
 
-  PRINTF("Client IPv6 addresses: ");
-  for(i = 0; i < UIP_DS6_ADDR_NB; i++) {
-    state = uip_ds6_if.addr_list[i].state;
-    if(uip_ds6_if.addr_list[i].isused &&
-       (state == ADDR_TENTATIVE || state == ADDR_PREFERRED)) {
-      PRINT6ADDR(&uip_ds6_if.addr_list[i].ipaddr);
-      PRINTF("\n");
-      /* hack to make address "final" */
-      if (state == ADDR_TENTATIVE) {
-    uip_ds6_if.addr_list[i].state = ADDR_PREFERRED;
-      }
+    PRINTF("Client IPv6 addresses: ");
+    for(i = 0; i < UIP_DS6_ADDR_NB; i++) {
+        state = uip_ds6_if.addr_list[i].state;
+        if(uip_ds6_if.addr_list[i].isused &&
+            (state == ADDR_TENTATIVE || state == ADDR_PREFERRED)) {
+            PRINT6ADDR(&uip_ds6_if.addr_list[i].ipaddr);
+            PRINTF("\n");
+            /* hack to make address "final" */
+            if (state == ADDR_TENTATIVE) {
+                uip_ds6_if.addr_list[i].state = ADDR_PREFERRED;
+            }
+        }
     }
-  }
 }
 /*---------------------------------------------------------------------------*/
 static void
 set_global_address(void)
 {
-  uip_ipaddr_t ipaddr;
+    uip_ipaddr_t ipaddr;
 
-  uip_ip6addr(&ipaddr, UIP_DS6_DEFAULT_PREFIX, 0, 0, 0, 0, 0x00ff, 0xfe00, 11);
-  //uip_ds6_set_addr_iid(&ipaddr, &uip_lladdr);
-  uip_ds6_addr_add(&ipaddr, 0, ADDR_MANUAL);
+    uip_ip6addr(&ipaddr, UIP_DS6_DEFAULT_PREFIX, 0, 0, 0, 0, 0x00ff, 0xfe00, 11);
+    uip_ds6_addr_add(&ipaddr, 0, ADDR_MANUAL);
 
+    uip_ip6addr(&energest_ipaddr, UIP_DS6_DEFAULT_PREFIX, 0, 0, 0, 0, 0x00ff, 0xfe00, 3);
 /* The choice of server address determines its 6LoWPAN header compression.
  * (Our address will be compressed Mode 3 since it is derived from our
  * link-local address)
@@ -297,8 +291,7 @@ set_global_address(void)
    uip_ip6addr(&server_ipaddr, UIP_DS6_DEFAULT_PREFIX, 0, 0, 0, 0, 0, 0, 1);
 #elif 1
 /* Mode 2 - 16 bits inline */
-  uip_ip6addr(&server_ipaddr, UIP_DS6_DEFAULT_PREFIX, 0, 0, 0, 0, 0x00ff, 0xfe00, 10);
-  uip_ip6addr(&energest_ipaddr, UIP_DS6_DEFAULT_PREFIX, 0, 0, 0, 0, 0x00ff, 0xfe00, 3);
+    uip_ip6addr(&server_ipaddr, UIP_DS6_DEFAULT_PREFIX, 0, 0, 0, 0, 0x00ff, 0xfe00, 10);
 #else
 /* Mode 3 - derived from server link-local (MAC) address */
   uip_ip6addr(&server_ipaddr, UIP_DS6_DEFAULT_PREFIX, 0, 0, 0, 0x0250, 0xc2ff, 0xfea8, 0xcd1a); //redbee-econotag

@@ -1,30 +1,12 @@
 /**
  * \file
- *          Unicast receiving test program
- *          Accepts messages from everybody
- * \author
- *         Marie-Paule Uwase
- *         August 13, 2012
- *         Tested and modified on September 8, 2012. Includes a useless but necessary timer!
- *         Writes with a fixed format in the serialdump to facilitate transfer of data to excel.
- *         Ack power is 0dBm, regardless of the sender settings (???).
- *         Version used for measurements on May 18, 2013 in Poix.
- *         Adapted by Maite Bezunartea to serve in the white (observer) sink of a dual network.
- *         Version used by JT in Poix on April 26, 2015.
- *         Refactored by JT on May 5, 2015
- *         
- *          
- */
-
-/**
- * \file
- *          Unicast receiving test program
+ *          Sink to receive energest data from observed motes
  *          Accepts messages from everybody
  * \author
  *         Marie-Paule Uwase
  *         August 13, 2012
  *         Roald Van Glabbeek
- *              March 3, 2020
+ *         March 3, 2020
  * 
  *         Updated for newer contiki release en Zolertia Zoul (firefly) and IPv6
  */
@@ -84,7 +66,6 @@ tcpip_handler()
 {
     rtimer_clock_t rtime = RTIMER_NOW();        //received time (for the latency)
     struct energestmsg *msg;
-    //memcpy(&msg, packetbuf_dataptr(), sizeof(msg));
     msg = (struct energestmsg *)uip_appdata;
     received ++;
     uint16_t timestamp = packetbuf_attr(PACKETBUF_ATTR_TIMESTAMP);        

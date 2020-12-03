@@ -29,14 +29,14 @@
 
 /**
  * \file
- *         White (observer) sender program for the dual network.
- *         This program sends a messsage to the white sink whenever it is trigered via GPIO pin 1.0 by the connected black mote.
+ *         Observer sender program for the dual network.
+ *         This program sends a messsage to the white sink whenever it is trigered via GPIO pin A7 by the connected observed mote.
  *
  * \author
  *         Marie-Paule Uwase
  *         August 7, 2012
  *         Roald Van Glabbeek
- *              March 3, 2020
+ *         March 3, 2020
  * 
  *         Updated for newer contiki release en Zolertia Zoul (firefly) and IPv6
  */
@@ -64,10 +64,6 @@
 #define DEBUG DEBUG_FULL
 #include "net/ip/uip-debug.h"
 
-/*
- * Interval between consecutive probes of the triger bit P1.0
- */
-
 #define ADC_READ_INTERVAL (CLOCK_SECOND/128)
 
 // Bit-width of IO communication with observer
@@ -76,18 +72,17 @@
 /* 
  * Data structure of sent messages
  */
-uint16_t  whiteseqno=0;
+uint16_t  observer_seqno=0;
 uint32_t  ADCResult=0;
 uint32_t  counter=0;
-//uint8_t   flag;
 
 struct whitemsg {
-    uint16_t  blackseqno;
-    uint16_t whiteseqno;
-    uint32_t energy;
-    uint16_t counter_ADC;
-    uint32_t timestamp_app;
-    uint16_t timestamp_mac;
+    uint16_t    observed_seqno;
+    uint16_t    observer_seqno;
+    uint32_t    energy;
+    uint16_t    counter_ADC;
+    uint32_t    timestamp_app;
+    uint16_t    timestamp_mac;
 };
 
 uint32_t prev_time;
@@ -99,9 +94,11 @@ uint32_t prev_time;
 uint8_t power = 31;
 
 static struct uip_udp_conn *client_conn;
-static uip_ipaddr_t server_ipaddr;
+static uip_ipaddr_t server_ipaddr;  // sink address
 
 static void send_packet(void *ptr);
+
+int ADC_val=0;
 
 /*---------------------------------------------------------------------------*/
 PROCESS(observer_sender_process, "Observer sender process");
@@ -110,8 +107,7 @@ AUTOSTART_PROCESSES(&observer_sender_process);
  * SETTING THE GPIOS
  *-------------------------------------------------------------------------------*/
 void msg_callback(uint8_t port, uint8_t pin){
-  PRINTF("Received data over GPIO\n");
-  send_packet(NULL);
+    send_packet(NULL);
 }
 void
 GPIOS_init(void)
@@ -130,13 +126,13 @@ GPIOS_init(void)
     GPIO_SET_INPUT(GPIO_D_BASE,GPIO_PIN_MASK(1));        //GPIO PD1
     GPIO_SET_INPUT(GPIO_D_BASE,GPIO_PIN_MASK(2));        //GPIO PD2
 
+    // PA7 as interrupt pin on rising and falling edge
     GPIO_SOFTWARE_CONTROL(GPIO_A_BASE,GPIO_PIN_MASK(7));
     GPIO_SET_INPUT(GPIO_A_BASE,GPIO_PIN_MASK(7));
     GPIO_DETECT_EDGE(GPIO_A_BASE,GPIO_PIN_MASK(7));
-    //GPIO_TRIGGER_SINGLE_EDGE(GPIO_A_BASE,GPIO_PIN_MASK(7));
     GPIO_TRIGGER_BOTH_EDGES(GPIO_A_BASE,GPIO_PIN_MASK(7));
-    //GPIO_DETECT_RISING(GPIO_A_BASE,GPIO_PIN_MASK(7));
     GPIO_ENABLE_INTERRUPT(GPIO_A_BASE,GPIO_PIN_MASK(7));
+    // interrupt is handled in msg_callback function
     gpio_register_callback(msg_callback, 0, 7);
 }
 /*---------------------------------------------------------------------------*/
@@ -144,31 +140,31 @@ uint16_t
 read_GPIOS(void)
 {
     //reading the value in each pin
-    uint16_t  blackseqno=0;
+    uint16_t  observed_seqno=0;
 
-    if (GPIO_READ_PIN(GPIO_A_BASE,GPIO_PIN_MASK(6)))    blackseqno=blackseqno+1;        
-    if (GPIO_READ_PIN(GPIO_C_BASE,GPIO_PIN_MASK(0)))    blackseqno=blackseqno+2;
-    if (GPIO_READ_PIN(GPIO_C_BASE,GPIO_PIN_MASK(1)))    blackseqno=blackseqno+4; 
-    if (GPIO_READ_PIN(GPIO_C_BASE,GPIO_PIN_MASK(2)))    blackseqno=blackseqno+8;
-    if (GPIO_READ_PIN(GPIO_C_BASE,GPIO_PIN_MASK(3)))    blackseqno=blackseqno+16; 
-    if (GPIO_READ_PIN(GPIO_C_BASE,GPIO_PIN_MASK(4)))    blackseqno=blackseqno+32; 
-    if (GPIO_READ_PIN(GPIO_C_BASE,GPIO_PIN_MASK(5)))    blackseqno=blackseqno+64;
-    if (GPIO_READ_PIN(GPIO_C_BASE,GPIO_PIN_MASK(6)))    blackseqno=blackseqno+128; 
-    if (GPIO_READ_PIN(GPIO_D_BASE,GPIO_PIN_MASK(0)))    blackseqno=blackseqno+256;
-    if (GPIO_READ_PIN(GPIO_D_BASE,GPIO_PIN_MASK(1)))    blackseqno=blackseqno+512; 
-    if (GPIO_READ_PIN(GPIO_D_BASE,GPIO_PIN_MASK(2)))    blackseqno=blackseqno+1024; 
+    if (GPIO_READ_PIN(GPIO_A_BASE,GPIO_PIN_MASK(6)))    observed_seqno=observed_seqno+1;        
+    if (GPIO_READ_PIN(GPIO_C_BASE,GPIO_PIN_MASK(0)))    observed_seqno=observed_seqno+2;
+    if (GPIO_READ_PIN(GPIO_C_BASE,GPIO_PIN_MASK(1)))    observed_seqno=observed_seqno+4; 
+    if (GPIO_READ_PIN(GPIO_C_BASE,GPIO_PIN_MASK(2)))    observed_seqno=observed_seqno+8;
+    if (GPIO_READ_PIN(GPIO_C_BASE,GPIO_PIN_MASK(3)))    observed_seqno=observed_seqno+16; 
+    if (GPIO_READ_PIN(GPIO_C_BASE,GPIO_PIN_MASK(4)))    observed_seqno=observed_seqno+32; 
+    if (GPIO_READ_PIN(GPIO_C_BASE,GPIO_PIN_MASK(5)))    observed_seqno=observed_seqno+64;
+    if (GPIO_READ_PIN(GPIO_C_BASE,GPIO_PIN_MASK(6)))    observed_seqno=observed_seqno+128; 
+    if (GPIO_READ_PIN(GPIO_D_BASE,GPIO_PIN_MASK(0)))    observed_seqno=observed_seqno+256;
+    if (GPIO_READ_PIN(GPIO_D_BASE,GPIO_PIN_MASK(1)))    observed_seqno=observed_seqno+512; 
+    if (GPIO_READ_PIN(GPIO_D_BASE,GPIO_PIN_MASK(2)))    observed_seqno=observed_seqno+1024; 
 
-    return blackseqno;
+    return observed_seqno;
 }
 /*---------------------------------------------------------------------------*/
 static void
 send_packet(void *ptr)
 {
-    whiteseqno++;
+    observer_seqno++;
     struct whitemsg msg;
 
-    msg.blackseqno = read_GPIOS();    
-    msg.whiteseqno = whiteseqno;    
+    msg.observed_seqno = read_GPIOS();    
+    msg.observer_seqno = observer_seqno;    
     msg.energy = ADCResult;
     msg.counter_ADC = counter;
     msg.timestamp_app = RTIMER_NOW() - prev_time;
@@ -178,7 +174,6 @@ send_packet(void *ptr)
             server_ipaddr.u8[sizeof(server_ipaddr.u8) - 1]);
     uip_udp_packet_sendto(client_conn, &msg, sizeof(msg),
                             &server_ipaddr, UIP_HTONS(UDP_SERVER_PORT));
-
     ADCResult=0;
     counter=0;
     prev_time = msg.timestamp_app;
@@ -195,12 +190,12 @@ print_local_addresses(void)
         state = uip_ds6_if.addr_list[i].state;
         if(uip_ds6_if.addr_list[i].isused &&
         (state == ADDR_TENTATIVE || state == ADDR_PREFERRED)) {
-        PRINT6ADDR(&uip_ds6_if.addr_list[i].ipaddr);
-        PRINTF("\n");
-        /* hack to make address "final" */
-        if (state == ADDR_TENTATIVE) {
-        uip_ds6_if.addr_list[i].state = ADDR_PREFERRED;
-        }
+            PRINT6ADDR(&uip_ds6_if.addr_list[i].ipaddr);
+            PRINTF("\n");
+            /* hack to make address "final" */
+            if (state == ADDR_TENTATIVE) {
+                uip_ds6_if.addr_list[i].state = ADDR_PREFERRED;
+            }
         }
     }
 }
@@ -210,8 +205,8 @@ set_global_address(void)
 {
     uip_ipaddr_t ipaddr;
 
-    uip_ip6addr(&ipaddr, UIP_DS6_DEFAULT_PREFIX, 0, 0, 0, 0, 0x00ff, 0xfe00, 102);
-    uip_ds6_set_addr_iid(&ipaddr, &uip_lladdr);
+    // mote address
+    uip_ip6addr(&ipaddr, UIP_DS6_DEFAULT_PREFIX, 0, 0, 0, 0, 0x00ff, 0xfe00, 0x102);
     uip_ds6_addr_add(&ipaddr, 0, ADDR_MANUAL);
 
 /* The choice of server address determines its 6LoWPAN header compression.
@@ -241,6 +236,7 @@ set_global_address(void)
   uip_ip6addr(&server_ipaddr, UIP_DS6_DEFAULT_PREFIX, 0, 0, 0, 0x0250, 0xc2ff, 0xfea8, 0xcd1a); //redbee-econotag
 #endif
 }
+
 /*---------------------------------------------------------------------------*/
 PROCESS_THREAD(observer_sender_process, ev, data)
 {
@@ -269,15 +265,10 @@ PROCESS_THREAD(observer_sender_process, ev, data)
     PRINTF(" local/remote port %u/%u\n",
     UIP_HTONS(client_conn->lport), UIP_HTONS(client_conn->rport));
 
-    //flag=(GPIO_READ_PIN(GPIO_A_BASE,GPIO_PIN_MASK(7)));
-
-    // adjust power
-    //cc2420_set_txpower(power);
     NETSTACK_RADIO.set_value(RADIO_PARAM_TXPOWER, power);
 
-    // init ADC on A5, at 64 bit rate
-    adc_zoul.configure(SENSORS_HW_INIT,ZOUL_SENSORS_ADC1);
-    adc_zoul.configure(ZOUL_SENSORS_CONFIGURE_TYPE_DECIMATION_RATE, SOC_ADC_ADCCON_DIV_64);
+    // init ADC on A5
+    adc_zoul.configure(SENSORS_HW_INIT, ZOUL_SENSORS_ADC2);
 
     GPIOS_init();
     counter = 0;
@@ -288,9 +279,8 @@ PROCESS_THREAD(observer_sender_process, ev, data)
         PROCESS_WAIT_UNTIL(etimer_expired(&periodic));
 
         counter++;
-        int ADC_val = adc_zoul.value(ZOUL_SENSORS_ADC1);
+        ADC_val = adc_zoul.value(ZOUL_SENSORS_ADC2);
         ADCResult += ADC_val;
-        //printf("%d\n",ADC_val);
         etimer_reset(&periodic);
     }
 

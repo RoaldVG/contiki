@@ -35,7 +35,7 @@
  *         Marie-Paule Uwase
  *         August 13, 2012
  *         Roald Van Glabbeek
- *              March 3, 2020
+ *         March 3, 2020
  * 
  *         Updated for newer contiki release en Zolertia Zoul (firefly) and IPv6
  */
@@ -65,14 +65,11 @@
 
 static uip_ipaddr_t energest_ipaddr;
 
-// Bit-width of IO communication with observer
-//#define IO_WIDTH 11
-
 /* Data structure of messages sent from sender
  *
  */
 struct testmsg {       
-    uint16_t  blackseqno;
+    uint16_t  observed_seqno;
     uint16_t  timestamp_app;
     char      padding[44];
     int16_t   timestamp_mac;        
@@ -84,7 +81,7 @@ struct energestmsg {
     uint32_t     transmit;
     uint32_t     listen;
     uint16_t     seqno;
-    uint32_t    totaltime;
+    uint32_t     totaltime;
 };
 
 struct energestmsg prev_energest_vals;
@@ -105,7 +102,7 @@ GPIOS_init(void)
     GPIO_SET_OUTPUT(GPIO_A_BASE,GPIO_PIN_MASK(6));        //GPIO PA6
     GPIO_SET_OUTPUT(GPIO_A_BASE,GPIO_PIN_MASK(7));        //GPIO PA7
   
-     GPIO_SET_OUTPUT(GPIO_C_BASE,GPIO_PIN_MASK(0));        //GPIO PC0
+    GPIO_SET_OUTPUT(GPIO_C_BASE,GPIO_PIN_MASK(0));        //GPIO PC0
     GPIO_SET_OUTPUT(GPIO_C_BASE,GPIO_PIN_MASK(1));        //GPIO PC1
     GPIO_SET_OUTPUT(GPIO_C_BASE,GPIO_PIN_MASK(2));        //GPIO PC2
     GPIO_SET_OUTPUT(GPIO_C_BASE,GPIO_PIN_MASK(3));        //GPIO PC3
@@ -124,7 +121,7 @@ clear_GPIOS(void)
 {    
     GPIO_CLR_PIN(GPIO_A_BASE,GPIO_PIN_MASK(6));        //GPIO PA6
     
-     GPIO_CLR_PIN(GPIO_C_BASE,GPIO_PIN_MASK(0));        //GPIO PC0
+    GPIO_CLR_PIN(GPIO_C_BASE,GPIO_PIN_MASK(0));        //GPIO PC0
     GPIO_CLR_PIN(GPIO_C_BASE,GPIO_PIN_MASK(1));        //GPIO PC1
     GPIO_CLR_PIN(GPIO_C_BASE,GPIO_PIN_MASK(2));        //GPIO PC2
     GPIO_CLR_PIN(GPIO_C_BASE,GPIO_PIN_MASK(3));        //GPIO PC3
@@ -170,7 +167,7 @@ tcpip_handler()
 {
     struct testmsg msg;
     if(uip_newdata()) {
-        seqno = seqno < 2<<IO_WIDTH ? seqno+1 : 0;
+        seqno = seqno < 1<<IO_WIDTH ? seqno+1 : 0;
         memcpy(&msg, uip_appdata, sizeof(msg));
         PRINTF("DATA recv from %d\n", UIP_IP_BUF->srcipaddr.u8[sizeof(UIP_IP_BUF->srcipaddr.u8) - 1]);
 
@@ -182,6 +179,7 @@ tcpip_handler()
 
         clear_GPIOS();
         
+        // set data on data pins
         if ( seqno_bits[0]==1 )        GPIO_SET_PIN(GPIO_A_BASE,GPIO_PIN_MASK(6));       //  write a 1 in A6
         if ( seqno_bits[1]==1 )        GPIO_SET_PIN(GPIO_C_BASE,GPIO_PIN_MASK(0));       //  write a 1 in C0
         if ( seqno_bits[2]==1 )        GPIO_SET_PIN(GPIO_C_BASE,GPIO_PIN_MASK(1));       //  write a 1 in C1
@@ -194,6 +192,7 @@ tcpip_handler()
         if ( seqno_bits[9]==1 )        GPIO_SET_PIN(GPIO_D_BASE,GPIO_PIN_MASK(1));       //  write a 1 in D1
         if ( seqno_bits[10]==1 )       GPIO_SET_PIN(GPIO_D_BASE,GPIO_PIN_MASK(2));       //  write a 1 in D2
         
+        // change state of trigget pin
         if (GPIO_READ_PIN(GPIO_PORT_TO_BASE(0),GPIO_PIN_MASK(7)) == 0)
             GPIO_SET_PIN(GPIO_PORT_TO_BASE(0),GPIO_PIN_MASK(7));
         else
@@ -234,9 +233,11 @@ PROCESS_THREAD(observed_receiver_process, ev, data)
     PRINTF("UDP server started. nbr:%d routes:%d\n",
          NBR_TABLE_CONF_MAX_NEIGHBORS, UIP_CONF_MAX_ROUTES);
 
+    // set the motes IPv6 adress
     uip_ip6addr(&ipaddr, UIP_DS6_DEFAULT_PREFIX, 0, 0, 0, 0, 0x00ff, 0xfe00, 10);
-    uip_ip6addr(&energest_ipaddr, UIP_DS6_DEFAULT_PREFIX, 0, 0, 0, 0, 0x00ff, 0xfe00, 3);
     uip_ds6_addr_add(&ipaddr, 0, ADDR_MANUAL);
+
+    uip_ip6addr(&energest_ipaddr, UIP_DS6_DEFAULT_PREFIX, 0, 0, 0, 0, 0x00ff, 0xfe00, 3);
 
 #if UIP_CONF_ROUTER
 /* The choice of server address determines its 6LoWPAN header compression.

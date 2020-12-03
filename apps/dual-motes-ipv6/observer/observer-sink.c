@@ -18,13 +18,13 @@
 
 /**
  * \file
- *          Unicast receiving test program
+ *          Sink for receiving observed messages
  *          Accepts messages from everybody
  * \author
  *         Marie-Paule Uwase
  *         August 13, 2012
  *         Roald Van Glabbeek
- *              March 3, 2020
+ *         March 3, 2020
  * 
  *         Updated for newer contiki release en Zolertia Zoul (firefly) and IPv6
  */
@@ -71,8 +71,8 @@ static uint16_t received = 0 ;
 
 // Writes a title on the console
 struct whitemsg {
-    uint16_t    blackseqno;
-    uint16_t    whiteseqno;
+    uint16_t    observed_seqno;
+    uint16_t    observer_seqno;
     uint32_t    energy;
     uint16_t    counter_ADC;
     uint32_t    timestamp_app;
@@ -92,7 +92,7 @@ tcpip_handler(void)
         uint16_t timestamp = packetbuf_attr(PACKETBUF_ATTR_TIMESTAMP);
         printf("%x%x,%" PRIu16 ",%" PRIu16 ",%" PRIu16 ",%" PRIu32 ",%" PRIu16 ",%" PRIu32 ",%" PRIu16 ",%" PRIu16 ",%lu\n\r",
                 UIP_IP_BUF->srcipaddr.u8[sizeof(UIP_IP_BUF->srcipaddr.u8) - 2], UIP_IP_BUF->srcipaddr.u8[sizeof(UIP_IP_BUF->srcipaddr.u8) - 1], 
-                received,msg.blackseqno,msg.whiteseqno,
+                received,msg.observed_seqno,msg.observer_seqno,
                 msg.energy,msg.counter_ADC, 
                 msg.timestamp_app,msg.timestamp_mac,timestamp,rtime);
     }
@@ -111,7 +111,7 @@ print_local_addresses(void)
         PRINTF("\n");
         /* hack to make address "final" */
         if (state == ADDR_TENTATIVE) {
-    uip_ds6_if.addr_list[i].state = ADDR_PREFERRED;
+            uip_ds6_if.addr_list[i].state = ADDR_PREFERRED;
         }
     }
     }
