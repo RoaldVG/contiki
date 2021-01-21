@@ -232,7 +232,7 @@ send_packet()//void *ptr)
     uip_udp_packet_sendto(client_conn, &msg, sizeof(msg),
                         &server_ipaddr, UIP_HTONS(UDP_RCV_PORT));
 
-    if (seqno%ENERGEST_FREQ==0)
+    if (seqno%ENERGEST_FREQ==1)
         send_energest();
 }
 /*---------------------------------------------------------------------------*/
@@ -266,21 +266,7 @@ set_global_address(void)
     uip_ds6_addr_add(&ipaddr, 0, ADDR_MANUAL);
 
     uip_ip6addr(&energest_ipaddr, UIP_DS6_DEFAULT_PREFIX, 0, 0, 0, 0, 0x00ff, 0xfe00, 3);
-/* The choice of server address determines its 6LoWPAN header compression.
- * (Our address will be compressed Mode 3 since it is derived from our
- * link-local address)
- * Obviously the choice made here must also be selected in udp-server.c.
- *
- * For correct Wireshark decoding using a sniffer, add the /64 prefix to the
- * 6LowPAN protocol preferences,
- * e.g. set Context 0 to fd00::. At present Wireshark copies Context/128 and
- * then overwrites it.
- * (Setting Context 0 to fd00::1111:2222:3333:4444 will report a 16 bit
- * compressed address of fd00::1111:22ff:fe33:xxxx)
- *
- * Note the IPCMV6 checksum verification depends on the correct uncompressed
- * addresses.
- */
+
 
 #if UIP_CONF_ROUTER
 #error "Sender cannot be router, set UIP_CONF_ROUTET to 0"

@@ -234,8 +234,8 @@ PROCESS_THREAD(observed_receiver_process, ev, data)
          NBR_TABLE_CONF_MAX_NEIGHBORS, UIP_CONF_MAX_ROUTES);
 
     // set the motes IPv6 adress
-    uip_ip6addr(&ipaddr, UIP_DS6_DEFAULT_PREFIX, 0, 0, 0, 0, 0x00ff, 0xfe00, 10);
-    uip_ds6_addr_add(&ipaddr, 0, ADDR_MANUAL);
+    //uip_ip6addr(&ipaddr, UIP_DS6_DEFAULT_PREFIX, 0, 0, 0, 0, 0x00ff, 0xfe00, 10);
+    //uip_ds6_addr_add(&ipaddr, 0, ADDR_MANUAL);
 
     uip_ip6addr(&energest_ipaddr, UIP_DS6_DEFAULT_PREFIX, 0, 0, 0, 0, 0x00ff, 0xfe00, 3);
 
@@ -257,14 +257,14 @@ PROCESS_THREAD(observed_receiver_process, ev, data)
    uip_ip6addr(&ipaddr, UIP_DS6_DEFAULT_PREFIX, 0, 0, 0, 0, 0, 0, 1);
 #elif 1
 /* Mode 2 - 16 bits inline */
-    uip_ip6addr(&ipaddr, UIP_DS6_DEFAULT_PREFIX, 0, 0, 0, 0, 0, 0, 10);
+    uip_ip6addr(&ipaddr, UIP_DS6_DEFAULT_PREFIX, 0, 0, 0, 0, 0x00ff, 0xfe00, 10);
 #else
 /* Mode 3 - derived from link local (MAC) address */
   uip_ip6addr(&ipaddr, UIP_DS6_DEFAULT_PREFIX, 0, 0, 0, 0, 0, 0, 0);
   uip_ds6_set_addr_iid(&ipaddr, &uip_lladdr);
 #endif
 
-    uip_ds6_addr_add(&ipaddr, 0, ADDR_AUTOCONF);
+    uip_ds6_addr_add(&ipaddr, 0, ADDR_MANUAL);
 #if UIP_CONF_IPV6_RPL
     struct uip_ds6_addr *root_if;
     root_if = uip_ds6_addr_lookup(&ipaddr);
