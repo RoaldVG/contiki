@@ -126,7 +126,7 @@ GPIOS_init(void)
     GPIO_SET_INPUT(GPIO_D_BASE,GPIO_PIN_MASK(1));        //GPIO PD1
     GPIO_SET_INPUT(GPIO_D_BASE,GPIO_PIN_MASK(2));        //GPIO PD2
 
-    // PA7 as interrupt pin on rising and falling edge
+    // PA7 as interrupt pin on rising and any edge
     GPIO_SOFTWARE_CONTROL(GPIO_A_BASE,GPIO_PIN_MASK(7));
     GPIO_SET_INPUT(GPIO_A_BASE,GPIO_PIN_MASK(7));
     GPIO_DETECT_EDGE(GPIO_A_BASE,GPIO_PIN_MASK(7));
@@ -206,7 +206,7 @@ set_global_address(void)
     uip_ipaddr_t ipaddr;
 
     // mote address
-    uip_ip6addr(&ipaddr, UIP_DS6_DEFAULT_PREFIX, 0, 0, 0, 0, 0x00ff, 0xfe00, 0x102);
+    uip_ip6addr(&ipaddr, UIP_DS6_DEFAULT_PREFIX, 0, 0, 0, 0, 0x00ff, 0xfe00, 0xe4b0);//0x9c47);//
     uip_ds6_addr_add(&ipaddr, 0, ADDR_MANUAL);
 
 /* The choice of server address determines its 6LoWPAN header compression.
